@@ -1,0 +1,41 @@
+# Log files
+activity.log
+
+# Python cache and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# Project specific files
+
+
+# Runtime directories
+downloads/
+temp/
+
+# Test artifacts
+*.pdf
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Legacy printer references (old config artifacts)
+COM4
+CX725
+CT-S310II
+USB002
+Lexmark_192_168_1_55
+S310II
+CITIZEN CT-S310II

@@ -1,0 +1,49 @@
+[Google]
+spreadsheet_id = YOUR_SPREADSHEET_ID
+sheet_name = Sheet1
+
+[Printing]
+# Full path to Adobe Reader executable
+adobe_reader_path = C:\\Program Files (x86)\\Adobe\\Acrobat Reader DC\\Reader\\AcroRd32.exe
+# The printer for the text-based cover sheet
+cover_sheet_printer = Lexmark Printer
+# The printer for the PDF job
+pdf_printer = Lexmark Printer
+# The printer for the text-based receipt
+receipt_printer = Receipt Printer
+# Bypass options - set to True to skip printing to specific printers
+bypass_receipt_printer = False
+bypass_pdf_printer = False
+
+[Columns]
+# Define the column index (0-based) for each field in your Google Sheet.
+google_drive_link = 0
+quantity = 1
+two_sided = 2
+paper_size = 3
+staples = 4
+hole_punch = 5
+date_submitted = 6
+job_deadline = 7
+processed = 8
+# Job status tracking columns (for barcode scanning system)
+acknowledged = 12
+completed = 13
+# Error logging column (Column V = index 21)
+error_log = 21
+
+[Script]
+# How often to check the Google Sheet for new rows, in seconds.
+poll_interval = 10
+# Set to True to delete local copies of the PDF, cover sheet, and receipt after processing.
+cleanup_after_processing = True
+# Minutes to wait before deleting temp files (allows print spooling to complete)
+cleanup_delay_minutes = 10
+
+[Footer]
+# Enable footer text on printed PDFs (True/False)
+enable_footer = True
+# Font size for footer text (default: 6)
+footer_font_size = 6
+# Font family for footer text (default: Times-Roman)
+footer_font_family = Times-Roman
