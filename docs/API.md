@@ -278,3 +278,115 @@ curl -X PUT http://localhost:5000/api/jobs/9E8B7BBF/status \
   -H "Content-Type: application/json" \
   -d '{"acknowledged": true}'
 ```
+
+### Job Submission
+
+#### POST /jobs/submit
+Submit a new print job directly (bypasses Google Forms).
+
+**Auth:** Any authenticated user
+
+**Request:**
+```json
+{
+  "email": "user@example.com",
+  "room": "301",
+  "quantity": 25,
+  "paper_size": "Letter",
+  "two_sided": false,
+  "color": false,
+  "stapled": false,
+  "deadline": "2026-03-15",
+  "notes": "Special instructions",
+  "file_url": "/uploads/abc123.pdf"
+}
+```
+
+**Response (201):**
+```json
+{
+  "success": true,
+  "job_id": "9E8B7BBF",
+  "message": "Job 9E8B7BBF submitted successfully"
+}
+```
+
+#### POST /jobs/upload-file
+Upload a file for a print job.
+
+**Auth:** Any authenticated user
+
+**Request:** `multipart/form-data` with `file` field
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "file_url": "/uploads/abc123def456.pdf",
+  "original_name": "homework.pdf",
+  "size": 1234567
+}
+```
+
+---
+
+### Notifications
+
+#### GET /notifications/preferences
+Get notification preferences for current user.
+
+**Auth:** Any authenticated user
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "preferences": {
+    "browser_notifications": true,
+    "sound_alerts": true,
+    "email_notifications": false
+  }
+}
+```
+
+#### PUT /notifications/preferences
+Update notification preferences.
+
+**Auth:** Any authenticated user
+
+**Request (all fields optional):**
+```json
+{
+  "browser_notifications": true,
+  "sound_alerts": false,
+  "email_notifications": true
+}
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Preferences updated"
+}
+```
+
+---
+
+### WebSocket Events
+
+Connect via Socket.IO at `ws://localhost:5000`
+
+#### Client → Server
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `connect` | — | Establish connection |
+| `disconnect` | — | Disconnect |
+
+#### Server → Client
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `job:new` | `{job: {...}}` | New job submitted |
+| `job:updated` | `{job: {...}}` | Job status changed |
+| `stats:update` | `{stats: {...}}` | Job statistics changed |
+| `notification` | `{message, type}` | User notification |
