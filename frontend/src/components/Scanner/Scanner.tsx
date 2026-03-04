@@ -22,6 +22,8 @@ import {
 } from '@mui/material'
 import {
   QrCodeScanner,
+  Videocam,
+  VideocamOff,
   Delete,
   CheckCircle,
   HourglassEmpty,
@@ -30,6 +32,7 @@ import {
 import { RootState } from '../../store/store'
 import { jobService } from '../../services/jobs'
 import { Job } from '../../types'
+import CameraScanner from './CameraScanner'
 
 interface ScanRecord {
   jobId: string
@@ -46,6 +49,7 @@ export default function Scanner() {
   const [loading, setLoading] = useState(false)
   const [continuousMode, setContinuousMode] = useState(false)
   const [autoUpdate, setAutoUpdate] = useState(true)
+  const [cameraActive, setCameraActive] = useState(false)
   const [scanHistory, setScanHistory] = useState<ScanRecord[]>([])
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'info' })
   const inputRef = useRef<HTMLInputElement>(null)
@@ -192,8 +196,24 @@ export default function Scanner() {
             control={<Switch checked={autoUpdate} onChange={(e) => setAutoUpdate(e.target.checked)} size="small" />}
             label={<Typography variant="body2">Auto-Update Status</Typography>}
           />
+          <Button
+            variant={cameraActive ? 'contained' : 'outlined'}
+            size="small"
+            startIcon={cameraActive ? <VideocamOff /> : <Videocam />}
+            onClick={() => setCameraActive(!cameraActive)}
+            color={cameraActive ? 'error' : 'primary'}
+          >
+            {cameraActive ? 'Stop Camera' : 'Use Camera'}
+          </Button>
         </Box>
       </Paper>
+
+      {/* Camera Scanner */}
+      {cameraActive && (
+        <Box mb={3}>
+          <CameraScanner active={cameraActive} onScan={(code) => { setJobId(code); handleScan() }} />
+        </Box>
+      )}
 
       {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 

@@ -6,6 +6,7 @@ import { store } from './store/store'
 import Login from './components/Login'
 import Dashboard from './components/Dashboard/Dashboard'
 import QueueManager from './components/QueueManager/QueueManager'
+import JobTimeline from './components/QueueManager/JobTimeline'
 import Scanner from './components/Scanner/Scanner'
 import AdminPanel from './components/AdminPanel/AdminPanel'
 import JobSubmission from './components/JobSubmission/JobSubmission'
@@ -37,6 +38,7 @@ function App() {
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="queue" element={<QueueManager />} />
+              <Route path="timeline" element={<JobTimeline />} />
               <Route path="scanner" element={<Scanner />} />
               <Route path="submit" element={<JobSubmission />} />
               <Route path="settings" element={<NotificationPreferences />} />

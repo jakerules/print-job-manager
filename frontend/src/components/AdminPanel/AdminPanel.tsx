@@ -29,9 +29,11 @@ import {
   Tabs,
   Tab,
 } from '@mui/material'
-import { Add, Edit, Delete, PersonAdd, Settings } from '@mui/icons-material'
+import { Add, Edit, Delete, PersonAdd, Settings, History, MonitorHeart } from '@mui/icons-material'
 import { authService } from '../../services/auth'
 import api from '../../services/api'
+import AuditLogViewer from './AuditLogViewer'
+import SystemHealth from './SystemHealth'
 
 interface User {
   id: number
@@ -135,6 +137,8 @@ export default function AdminPanel() {
 
       <Tabs value={tab} onChange={(_e, v) => setTab(v)} sx={{ mb: 3 }}>
         <Tab icon={<PersonAdd />} label="Users" iconPosition="start" />
+        <Tab icon={<History />} label="Activity" iconPosition="start" />
+        <Tab icon={<MonitorHeart />} label="Health" iconPosition="start" />
         <Tab icon={<Settings />} label="Settings" iconPosition="start" />
       </Tabs>
 
@@ -185,8 +189,14 @@ export default function AdminPanel() {
         </>
       )}
 
+      {/* Activity Log Tab */}
+      {tab === 1 && <AuditLogViewer />}
+
+      {/* System Health Tab */}
+      {tab === 2 && <SystemHealth />}
+
       {/* Settings Tab */}
-      {tab === 1 && (
+      {tab === 3 && (
         <Paper sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom>System Settings</Typography>
           <Alert severity="info" sx={{ mb: 2 }}>

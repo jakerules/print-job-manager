@@ -14,6 +14,8 @@ from api.auth import auth_bp
 from api.users import users_bp
 from api.jobs import jobs_bp
 from api.notifications import notifications_bp
+from api.audit import audit_bp
+from api.health import health_bp
 
 # Import WebSocket
 from api.websocket import socketio
@@ -34,6 +36,8 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(users_bp)
 app.register_blueprint(jobs_bp)
 app.register_blueprint(notifications_bp)
+app.register_blueprint(audit_bp)
+app.register_blueprint(health_bp)
 
 
 @app.route('/')
