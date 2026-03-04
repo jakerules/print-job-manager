@@ -15,7 +15,9 @@ RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
 COPY backend/ .
 
-RUN mkdir -p /app/database /app/uploads
+RUN mkdir -p /data/db /app/uploads
+
+ENV DB_DIR=/data/db
 
 EXPOSE 5000
 

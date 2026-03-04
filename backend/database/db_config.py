@@ -5,8 +5,8 @@ import os
 import sqlite3
 from pathlib import Path
 
-# Database path
-DB_DIR = Path(__file__).parent
+# Database path — honour DB_DIR env var so Docker can mount data separately
+DB_DIR = Path(os.environ.get('DB_DIR', str(Path(__file__).parent)))
 DB_PATH = DB_DIR / 'users.db'
 
 

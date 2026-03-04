@@ -13,7 +13,7 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - db-data:/app/database
+      - db-data:/data/db
       - uploads:/app/uploads
       # Uncomment BOTH lines below for Google Sheets integration:
       # - ${CONFIG_DIR:-./config}:/app/config:ro

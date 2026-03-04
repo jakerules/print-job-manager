@@ -14,7 +14,7 @@ services:
     ports:
       - "5080:5000"
     volumes:
-      - ./database:/app/database
+      - ./database:/data/db
       - ./uploads:/app/uploads
     environment:
       - FLASK_ENV=production
