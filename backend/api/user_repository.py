@@ -1,7 +1,7 @@
 """
 User repository for database operations.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 import sys
 import os
@@ -109,7 +109,7 @@ class UserRepository:
                 SET username = ?, email = ?, password_hash = ?, role = ?, is_active = ?, last_login = ?
                 WHERE id = ?
             ''', (user.username, user.email, user.password_hash, user.role, user.is_active,
-                  user.last_login, user.id))
+                  user.last_login.isoformat() if user.last_login else None, user.id))
             
             conn.commit()
             return cursor.rowcount > 0
@@ -144,7 +144,7 @@ class UserRepository:
         
         cursor.execute('''
             UPDATE users SET last_login = ? WHERE id = ?
-        ''', (datetime.utcnow(), user_id))
+        ''', (datetime.now(timezone.utc).isoformat(), user_id))
         
         conn.commit()
         conn.close()

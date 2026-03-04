@@ -1,7 +1,7 @@
 """
 SQLAlchemy models for user management.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 import bcrypt
 
@@ -18,7 +18,7 @@ class User:
         self.password_hash = password_hash
         self.role = role  # admin, manager, staff, submitter
         self.is_active = is_active
-        self.created_at = created_at or datetime.utcnow()
+        self.created_at = created_at or datetime.now(timezone.utc)
         self.last_login = last_login
     
     def set_password(self, password: str):
@@ -70,7 +70,7 @@ class Session:
     
     def is_expired(self) -> bool:
         """Check if the session has expired."""
-        return datetime.utcnow() > self.expires_at if self.expires_at else True
+        return datetime.now(timezone.utc) > self.expires_at if self.expires_at else True
     
     @classmethod
     def from_db_row(cls, row):
@@ -132,7 +132,7 @@ class AuditLog:
         self.resource_id = resource_id
         self.details = details
         self.ip_address = ip_address
-        self.timestamp = timestamp or datetime.utcnow()
+        self.timestamp = timestamp or datetime.now(timezone.utc)
     
     @classmethod
     def from_db_row(cls, row):

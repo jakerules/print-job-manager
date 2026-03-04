@@ -3,7 +3,7 @@ JWT authentication utilities.
 """
 import jwt
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any
 
 # Secret key for JWT (should be in environment variable in production)
@@ -30,14 +30,14 @@ def generate_token(user_id: int, username: str, role: str,
     if expires_delta is None:
         expires_delta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     
-    expire = datetime.utcnow() + expires_delta
+    expire = datetime.now(timezone.utc) + expires_delta
     
     payload = {
         'user_id': user_id,
         'username': username,
         'role': role,
         'exp': expire,
-        'iat': datetime.utcnow()
+        'iat': datetime.now(timezone.utc)
     }
     
     token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -55,12 +55,12 @@ def generate_refresh_token(user_id: int) -> str:
         Refresh token string
     """
     expires_delta = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    expire = datetime.utcnow() + expires_delta
+    expire = datetime.now(timezone.utc) + expires_delta
     
     payload = {
         'user_id': user_id,
         'exp': expire,
-        'iat': datetime.utcnow(),
+        'iat': datetime.now(timezone.utc),
         'type': 'refresh'
     }
     
