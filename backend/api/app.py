@@ -12,6 +12,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Import blueprints
 from api.auth import auth_bp
 from api.users import users_bp
+from api.jobs import jobs_bp
+
+# Import WebSocket
+from api.websocket import socketio
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -21,9 +25,13 @@ CORS(app)  # Enable CORS for frontend access
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['JSON_SORT_KEYS'] = False
 
+# Initialize SocketIO with app
+socketio.init_app(app)
+
 # Register blueprints
 app.register_blueprint(auth_bp)
 app.register_blueprint(users_bp)
+app.register_blueprint(jobs_bp)
 
 
 @app.route('/')
@@ -36,9 +44,10 @@ def index():
         'endpoints': {
             'auth': '/api/auth',
             'users': '/api/users',
-            'jobs': '/api/jobs (coming soon)',
+            'jobs': '/api/jobs',
             'scanner': '/api/scan (coming soon)'
-        }
+        },
+        'websocket': 'Socket.IO enabled'
     })
 
 
@@ -47,7 +56,8 @@ def health():
     """Health check endpoint."""
     return jsonify({
         'status': 'healthy',
-        'service': 'print-job-manager-api'
+        'service': 'print-job-manager-api',
+        'websocket': 'enabled'
     }), 200
 
 
@@ -66,7 +76,8 @@ def internal_error(error):
 if __name__ == '__main__':
     # Development server
     print("🚀 Starting Print Job Manager API...")
-    print("📍 Running on http://localhost:5000")
+    print("📍 HTTP: http://localhost:5000")
+    print("📡 WebSocket: ws://localhost:5000")
     print("⚠️  Default admin credentials: admin / admin123")
     print()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)

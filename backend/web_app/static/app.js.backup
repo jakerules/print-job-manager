@@ -1,0 +1,243 @@
+// Barcode Job Tracker - Frontend JavaScript
+
+let html5QrcodeScanner = null;
+let scanHistory = [];
+
+// DOM Elements
+const startScanBtn = document.getElementById('start-scan-btn');
+const stopScanBtn = document.getElementById('stop-scan-btn');
+const manualJobIdInput = document.getElementById('manual-job-id');
+const manualSubmitBtn = document.getElementById('manual-submit-btn');
+const statusMessage = document.getElementById('status-message');
+const jobDetails = document.getElementById('job-details');
+const historyList = document.getElementById('history-list');
+
+// Event Listeners
+startScanBtn.addEventListener('click', startScanner);
+stopScanBtn.addEventListener('click', stopScanner);
+manualSubmitBtn.addEventListener('click', handleManualSubmit);
+manualJobIdInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        handleManualSubmit();
+    }
+});
+
+// Initialize
+loadScanHistory();
+
+function startScanner() {
+    const config = {
+        fps: 10,
+        qrbox: { width: 250, height: 150 },
+        formatsToSupport: [Html5QrcodeSupportedFormats.CODE_128]
+    };
+
+    html5QrcodeScanner = new Html5Qrcode("reader");
+    
+    html5QrcodeScanner.start(
+        { facingMode: "environment" },
+        config,
+        onScanSuccess,
+        onScanFailure
+    ).then(() => {
+        console.log("Scanner started");
+        startScanBtn.style.display = 'none';
+        stopScanBtn.style.display = 'block';
+    }).catch(err => {
+        console.error("Error starting scanner:", err);
+        showStatus(`Scanner error: ${err}`, 'error');
+    });
+}
+
+function stopScanner() {
+    if (html5QrcodeScanner) {
+        html5QrcodeScanner.stop().then(() => {
+            console.log("Scanner stopped");
+            startScanBtn.style.display = 'block';
+            stopScanBtn.style.display = 'none';
+        }).catch(err => {
+            console.error("Error stopping scanner:", err);
+        });
+    }
+}
+
+function onScanSuccess(decodedText, decodedResult) {
+    console.log(`Scanned: ${decodedText}`);
+    
+    // Auto-stop scanner after successful scan
+    stopScanner();
+    
+    // Process the scanned job ID
+    processJobId(decodedText);
+}
+
+function onScanFailure(error) {
+    // Ignore scan failures (normal when no barcode in view)
+}
+
+function handleManualSubmit() {
+    const jobId = manualJobIdInput.value.trim().toUpperCase();
+    
+    if (!jobId) {
+        showStatus('Please enter a Job ID', 'error');
+        return;
+    }
+    
+    processJobId(jobId);
+    manualJobIdInput.value = '';
+}
+
+async function processJobId(jobId) {
+    try {
+        showStatus('Processing...', 'warning');
+        
+        // Call API to scan barcode
+        const response = await fetch('/api/scan', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ job_id: jobId })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showStatus(`✓ ${capitalizeFirst(data.action)}!`, 'success');
+            displayJobDetails(data.job, data.action);
+            addToHistory(jobId, data.action);
+        } else {
+            showStatus(`Error: ${data.error}`, 'error');
+            jobDetails.classList.add('hidden');
+        }
+        
+    } catch (error) {
+        console.error('Error processing job:', error);
+        showStatus('Network error. Please try again.', 'error');
+        jobDetails.classList.add('hidden');
+    }
+}
+
+function displayJobDetails(job, action) {
+    // Populate job details
+    document.getElementById('detail-job-id').textContent = job.job_id || '-';
+    document.getElementById('detail-email').textContent = job.email || '-';
+    document.getElementById('detail-room').textContent = job.room || '-';
+    document.getElementById('detail-quantity').textContent = job.quantity || '-';
+    document.getElementById('detail-paper-size').textContent = job.paper_size || '-';
+    document.getElementById('detail-two-sided').textContent = job.two_sided || '-';
+    document.getElementById('detail-date').textContent = job.date_submitted || '-';
+    document.getElementById('detail-deadline').textContent = job.job_deadline || '-';
+    
+    // Update status badge
+    const badge = document.getElementById('job-status-badge');
+    if (job.status.completed) {
+        badge.textContent = 'Completed';
+        badge.className = 'badge completed';
+    } else if (job.status.acknowledged) {
+        badge.textContent = 'Acknowledged';
+        badge.className = 'badge acknowledged';
+    } else {
+        badge.textContent = 'Pending';
+        badge.className = 'badge pending';
+    }
+    
+    // Update action message
+    const actionMessage = document.getElementById('action-message');
+    if (action === 'acknowledged') {
+        actionMessage.textContent = '✓ Job Acknowledged - Ready for pickup';
+        actionMessage.className = 'acknowledged';
+    } else if (action === 'completed') {
+        actionMessage.textContent = '✓✓ Job Completed - Delivered';
+        actionMessage.className = 'completed';
+    } else if (action === 'already_completed') {
+        actionMessage.textContent = 'This job was already completed';
+        actionMessage.className = 'already-completed';
+    }
+    
+    // Show job details card
+    jobDetails.classList.remove('hidden');
+    
+    // Scroll to job details
+    jobDetails.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function showStatus(message, type) {
+    statusMessage.textContent = message;
+    statusMessage.className = `status-message ${type}`;
+    statusMessage.classList.remove('hidden');
+    
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+        statusMessage.classList.add('hidden');
+    }, 5000);
+}
+
+function addToHistory(jobId, action) {
+    const timestamp = new Date().toLocaleTimeString();
+    const historyItem = {
+        jobId,
+        action,
+        timestamp
+    };
+    
+    scanHistory.unshift(historyItem);
+    
+    // Keep only last 10 items
+    if (scanHistory.length > 10) {
+        scanHistory = scanHistory.slice(0, 10);
+    }
+    
+    saveScanHistory();
+    renderHistory();
+}
+
+function renderHistory() {
+    historyList.innerHTML = '';
+    
+    if (scanHistory.length === 0) {
+        historyList.innerHTML = '<p style="text-align:center; color:#999;">No scans yet</p>';
+        return;
+    }
+    
+    scanHistory.forEach(item => {
+        const historyItem = document.createElement('div');
+        historyItem.className = 'history-item';
+        historyItem.innerHTML = `
+            <div>
+                <div class="job-id">${item.jobId}</div>
+                <div class="action">${capitalizeFirst(item.action)}</div>
+            </div>
+            <div class="timestamp">${item.timestamp}</div>
+        `;
+        historyList.appendChild(historyItem);
+    });
+}
+
+function saveScanHistory() {
+    try {
+        localStorage.setItem('scanHistory', JSON.stringify(scanHistory));
+    } catch (e) {
+        console.error('Error saving history:', e);
+    }
+}
+
+function loadScanHistory() {
+    try {
+        const stored = localStorage.getItem('scanHistory');
+        if (stored) {
+            scanHistory = JSON.parse(stored);
+            renderHistory();
+        }
+    } catch (e) {
+        console.error('Error loading history:', e);
+    }
+}
+
+function capitalizeFirst(str) {
+    if (!str) return '';
+    return str.charAt(0).toUpperCase() + str.slice(1).replace('_', ' ');
+}
+
+// Auto-focus manual input on load
+manualJobIdInput.focus();

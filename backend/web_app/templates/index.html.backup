@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Barcode Job Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📦 Job Barcode Scanner</h1>
+            <p class="subtitle">Scan receipts to track print jobs</p>
+        </header>
+
+        <main>
+            <!-- Scanner Section -->
+            <div class="scanner-section">
+                <div id="scanner-container">
+                    <div id="reader"></div>
+                </div>
+                
+                <div class="scanner-controls">
+                    <button id="start-scan-btn" class="btn btn-primary">
+                        📷 Start Camera Scanner
+                    </button>
+                    <button id="stop-scan-btn" class="btn btn-secondary" style="display:none;">
+                        ⏹️ Stop Scanner
+                    </button>
+                </div>
+
+                <!-- Manual Entry -->
+                <div class="manual-entry">
+                    <p class="manual-label">Or enter Job ID manually:</p>
+                    <div class="input-group">
+                        <input type="text" id="manual-job-id" placeholder="e.g., 9E8B7BBF" />
+                        <button id="manual-submit-btn" class="btn btn-primary">Submit</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status Display -->
+            <div id="status-message" class="status-message hidden"></div>
+
+            <!-- Job Details Card -->
+            <div id="job-details" class="job-details hidden">
+                <div class="job-header">
+                    <h2>Job Details</h2>
+                    <span id="job-status-badge" class="badge"></span>
+                </div>
+                
+                <div class="job-info">
+                    <div class="info-row">
+                        <span class="label">Job ID:</span>
+                        <span id="detail-job-id" class="value">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Submitted by:</span>
+                        <span id="detail-email" class="value">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Room:</span>
+                        <span id="detail-room" class="value">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Quantity:</span>
+                        <span id="detail-quantity" class="value">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Paper Size:</span>
+                        <span id="detail-paper-size" class="value">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Two-Sided:</span>
+                        <span id="detail-two-sided" class="value">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Submitted:</span>
+                        <span id="detail-date" class="value">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Deadline:</span>
+                        <span id="detail-deadline" class="value">-</span>
+                    </div>
+                </div>
+
+                <div class="action-taken">
+                    <div id="action-message"></div>
+                </div>
+            </div>
+
+            <!-- Scan History -->
+            <div class="scan-history">
+                <h3>Recent Scans</h3>
+                <div id="history-list"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Include Html5-QRCode library -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
