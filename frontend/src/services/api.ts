@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosRequestConfig } from 'axios'
 import { API_BASE_URL, API_TIMEOUT } from '../config'
 
 class ApiService {
-  private client: AxiosInstance
+  public client: AxiosInstance
 
   constructor() {
     this.client = axios.create({
@@ -80,3 +80,8 @@ class ApiService {
 }
 
 export const apiService = new ApiService()
+
+// Default export: raw axios client with auth interceptors
+// Components use: import api from '../services/api'; api.get('/url').then(res => res.data)
+const api = new ApiService()
+export default api.client

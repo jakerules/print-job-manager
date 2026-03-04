@@ -42,7 +42,7 @@ const statusIcon = (job: Job) => {
   return <FiberNew />
 }
 
-const statusColor = (job: Job): 'success' | 'primary' | 'warning' | 'grey' => {
+const statusColor = (job: Job): 'success' | 'primary' | 'warning' | 'default' => {
   if (job.completed) return 'success'
   if (job.acknowledged) return 'primary'
   return 'warning'
