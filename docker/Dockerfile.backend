@@ -18,6 +18,7 @@ COPY backend/ .
 RUN mkdir -p /data/db /app/uploads
 
 ENV DB_DIR=/data/db
+ENV PYTHONPATH=/app
 
 EXPOSE 5000
 
