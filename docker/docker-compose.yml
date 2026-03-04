@@ -1,12 +1,11 @@
-version: "3.8"
-
 # Pull pre-built images from GitHub Container Registry.
 # No build step needed — just run:
 #   docker compose up -d
 #
-# To connect Google Sheets, create these files next to docker-compose.yml:
-#   config/config.ini    — copy settings from the repo's backend/config/config.ini.example
-#   credentials.json     — your Google Service Account key
+# Optional — Google Sheets integration:
+#   mkdir -p config && cp your-config.ini config/config.ini
+#   cp your-credentials.json credentials.json
+#   Then uncomment the two volume lines below and restart.
 
 services:
   backend:
@@ -16,8 +15,9 @@ services:
     volumes:
       - db-data:/app/database
       - uploads:/app/uploads
-      - ${CONFIG_DIR:-./config}:/app/config:ro
-      - ${CREDENTIALS_FILE:-./credentials.json}:/app/web_app/credentials.json:ro
+      # Uncomment BOTH lines below for Google Sheets integration:
+      # - ${CONFIG_DIR:-./config}:/app/config:ro
+      # - ${CREDENTIALS_FILE:-./credentials.json}:/app/web_app/credentials.json:ro
     environment:
       - FLASK_ENV=production
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-in-production}
@@ -34,8 +34,7 @@ services:
     ports:
       - "80:80"
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     restart: unless-stopped
 
 volumes:

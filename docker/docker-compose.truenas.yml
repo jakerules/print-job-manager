@@ -1,19 +1,12 @@
-version: "3.8"
-
 # TrueNAS SCALE docker-compose
 # =============================
 # 1. Create a dataset for app data, e.g.: /mnt/pool/apps/print-job-manager
-# 2. Place this file there along with credentials (optional)
-# 3. Run:  docker compose up -d
+# 2. Place this file there and run:  docker compose up -d
+# 3. App will be at http://<truenas-ip>:9080
 #
-# Directory layout:
-#   /mnt/pool/apps/print-job-manager/
-#   ├── docker-compose.yml      ← this file
-#   ├── database/               ← created automatically (SQLite)
-#   ├── uploads/                ← created automatically (file uploads)
-#   ├── credentials.json        ← optional: Google Service Account key
-#   └── config/
-#       └── config.ini          ← optional: Google Sheets settings
+# Optional — Google Sheets integration:
+#   mkdir -p config && cp config.ini config/ && cp credentials.json .
+#   Then uncomment the two volume lines below and restart.
 
 services:
   backend:
@@ -21,15 +14,13 @@ services:
     ports:
       - "5080:5000"
     volumes:
-      # Use host paths on ZFS dataset so data persists across rebuilds
       - ./database:/app/database
       - ./uploads:/app/uploads
-      # Optional: Google Sheets integration
-      - ./config:/app/config:ro
-      - ./credentials.json:/app/web_app/credentials.json:ro
+      # Uncomment BOTH lines below for Google Sheets integration:
+      # - ./config:/app/config:ro
+      # - ./credentials.json:/app/web_app/credentials.json:ro
     environment:
       - FLASK_ENV=production
-      # IMPORTANT: Set a fixed secret so JWT tokens survive restarts
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-CHANGE-ME-use-a-random-string-here}
       - TZ=${TZ:-America/New_York}
     healthcheck:
@@ -43,9 +34,7 @@ services:
   frontend:
     image: ghcr.io/jakerules/print-job-manager/frontend:latest
     ports:
-      # Port 9080 to avoid conflict with TrueNAS web UI on 80/443
       - "9080:80"
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     restart: unless-stopped
