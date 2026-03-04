@@ -24,7 +24,10 @@ def get_preferences(current_user):
             'preferences': {
                 'browser_notifications': True,
                 'sound_alerts': True,
-                'email_notifications': False
+                'email_notifications': False,
+                'dnd_enabled': False,
+                'dnd_start': '22:00',
+                'dnd_end': '07:00',
             }
         }), 200
 
@@ -33,7 +36,10 @@ def get_preferences(current_user):
         'preferences': {
             'browser_notifications': bool(row['browser_notifications']),
             'sound_alerts': bool(row['sound_alerts']),
-            'email_notifications': bool(row['email_notifications'])
+            'email_notifications': bool(row['email_notifications']),
+            'dnd_enabled': bool(row['dnd_enabled']) if 'dnd_enabled' in row.keys() else False,
+            'dnd_start': row['dnd_start'] if 'dnd_start' in row.keys() else '22:00',
+            'dnd_end': row['dnd_end'] if 'dnd_end' in row.keys() else '07:00',
         }
     }), 200
 
@@ -59,7 +65,8 @@ def update_preferences(current_user):
     cursor.execute('SELECT id FROM notification_preferences WHERE user_id = ?', (current_user.id,))
     existing = cursor.fetchone()
 
-    fields = ['browser_notifications', 'sound_alerts', 'email_notifications']
+    fields = ['browser_notifications', 'sound_alerts', 'email_notifications', 'dnd_enabled']
+    str_fields = ['dnd_start', 'dnd_end']
 
     if existing:
         updates = []
@@ -68,6 +75,10 @@ def update_preferences(current_user):
             if f in data:
                 updates.append(f'{f} = ?')
                 values.append(1 if data[f] else 0)
+        for f in str_fields:
+            if f in data:
+                updates.append(f'{f} = ?')
+                values.append(str(data[f]))
         if updates:
             values.append(current_user.id)
             cursor.execute(
@@ -76,12 +87,15 @@ def update_preferences(current_user):
             )
     else:
         cursor.execute(
-            'INSERT INTO notification_preferences (user_id, browser_notifications, sound_alerts, email_notifications) VALUES (?, ?, ?, ?)',
+            'INSERT INTO notification_preferences (user_id, browser_notifications, sound_alerts, email_notifications, dnd_enabled, dnd_start, dnd_end) VALUES (?, ?, ?, ?, ?, ?, ?)',
             (
                 current_user.id,
                 1 if data.get('browser_notifications', True) else 0,
                 1 if data.get('sound_alerts', True) else 0,
                 1 if data.get('email_notifications', False) else 0,
+                1 if data.get('dnd_enabled', False) else 0,
+                data.get('dnd_start', '22:00'),
+                data.get('dnd_end', '07:00'),
             )
         )
 

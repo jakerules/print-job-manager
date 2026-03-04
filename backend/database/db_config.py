@@ -56,6 +56,9 @@ def init_db():
             browser_notifications BOOLEAN DEFAULT TRUE,
             sound_alerts BOOLEAN DEFAULT TRUE,
             email_notifications BOOLEAN DEFAULT FALSE,
+            dnd_enabled BOOLEAN DEFAULT FALSE,
+            dnd_start VARCHAR(5) DEFAULT '22:00',
+            dnd_end VARCHAR(5) DEFAULT '07:00',
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     ''')
@@ -76,6 +79,16 @@ def init_db():
     ''')
     
     conn.commit()
+
+    # Migration: add DND columns if missing
+    try:
+        cursor.execute("SELECT dnd_enabled FROM notification_preferences LIMIT 1")
+    except sqlite3.OperationalError:
+        cursor.execute("ALTER TABLE notification_preferences ADD COLUMN dnd_enabled BOOLEAN DEFAULT FALSE")
+        cursor.execute("ALTER TABLE notification_preferences ADD COLUMN dnd_start VARCHAR(5) DEFAULT '22:00'")
+        cursor.execute("ALTER TABLE notification_preferences ADD COLUMN dnd_end VARCHAR(5) DEFAULT '07:00'")
+        conn.commit()
+
     conn.close()
     print(f"Database initialized at {DB_PATH}")
 

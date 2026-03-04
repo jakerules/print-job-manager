@@ -9,14 +9,18 @@ import {
   Alert,
   Snackbar,
   Button,
+  TextField,
 } from '@mui/material'
-import { Save } from '@mui/icons-material'
+import { Save, DoNotDisturb } from '@mui/icons-material'
 import api from '../../services/api'
 
 interface Prefs {
   browser_notifications: boolean
   sound_alerts: boolean
   email_notifications: boolean
+  dnd_enabled: boolean
+  dnd_start: string
+  dnd_end: string
 }
 
 export default function NotificationPreferences() {
@@ -24,6 +28,9 @@ export default function NotificationPreferences() {
     browser_notifications: true,
     sound_alerts: true,
     email_notifications: false,
+    dnd_enabled: false,
+    dnd_start: '22:00',
+    dnd_end: '07:00',
   })
   const [dirty, setDirty] = useState(false)
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' })
@@ -83,6 +90,39 @@ export default function NotificationPreferences() {
         <Typography variant="caption" color="text.secondary" sx={{ ml: 6, mt: -1 }}>
           Receive email summaries of pending jobs (coming soon)
         </Typography>
+
+        <Divider sx={{ my: 1 }} />
+
+        <FormControlLabel
+          control={<Switch checked={prefs.dnd_enabled} onChange={() => handleToggle('dnd_enabled')} />}
+          label={<Box display="flex" alignItems="center" gap={0.5}><DoNotDisturb fontSize="small" /> Do Not Disturb</Box>}
+        />
+        <Typography variant="caption" color="text.secondary" sx={{ ml: 6, mt: -1 }}>
+          Silence all notifications during the specified hours
+        </Typography>
+
+        {prefs.dnd_enabled && (
+          <Box display="flex" gap={2} ml={6} mt={1}>
+            <TextField
+              label="Start"
+              type="time"
+              size="small"
+              value={prefs.dnd_start}
+              onChange={(e) => { setPrefs((p) => ({ ...p, dnd_start: e.target.value })); setDirty(true) }}
+              InputLabelProps={{ shrink: true }}
+              sx={{ width: 130 }}
+            />
+            <TextField
+              label="End"
+              type="time"
+              size="small"
+              value={prefs.dnd_end}
+              onChange={(e) => { setPrefs((p) => ({ ...p, dnd_end: e.target.value })); setDirty(true) }}
+              InputLabelProps={{ shrink: true }}
+              sx={{ width: 130 }}
+            />
+          </Box>
+        )}
       </Box>
 
       {dirty && (
