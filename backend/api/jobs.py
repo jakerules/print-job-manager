@@ -7,15 +7,32 @@ import os
 import secrets
 from datetime import datetime
 
-# Import the existing Google Sheets integration
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'web_app'))
-
 from api.auth_decorators import token_required, role_required
-from web_app.app import (
-    get_sheets_service, find_job_by_id, get_job_status, 
-    mark_job_status, extract_job_details, get_sheet_id,
-    SPREADSHEET_ID, SHEET_NAME, COLUMN_MAP
-)
+
+# Try to import the Google Sheets integration (requires config.ini + credentials.json)
+_sheets_available = False
+try:
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'web_app'))
+    from web_app.app import (
+        get_sheets_service, find_job_by_id, get_job_status,
+        mark_job_status, extract_job_details, get_sheet_id,
+        SPREADSHEET_ID, SHEET_NAME, COLUMN_MAP
+    )
+    _sheets_available = True
+except Exception as e:
+    print(f"⚠ Google Sheets integration unavailable: {e}")
+    print("  Job endpoints will return demo data. Add config.ini + credentials.json to enable.")
+
+    # Provide stubs so routes don't crash
+    def get_sheets_service(): return None
+    def find_job_by_id(svc, jid): return None
+    def get_job_status(row): return {'acknowledged': False, 'completed': False}
+    def mark_job_status(svc, row, status): return False
+    def extract_job_details(row): return {}
+    def get_sheet_id(svc, sid, sn): return None
+    SPREADSHEET_ID = ''
+    SHEET_NAME = ''
+    COLUMN_MAP = {}
 
 jobs_bp = Blueprint('jobs', __name__, url_prefix='/api/jobs')
 

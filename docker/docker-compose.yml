@@ -8,11 +8,20 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - ../backend/database:/app/database
-      - ../backend/uploads:/app/uploads
+      - db-data:/app/database
+      - uploads:/app/uploads
+      # Mount Google Sheets credentials if available
+      - ./config:/app/config:ro
+      - ./credentials.json:/app/web_app/credentials.json:ro
     environment:
       - FLASK_ENV=production
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-in-production}
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
 
   frontend:
@@ -22,5 +31,10 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  db-data:
+  uploads:

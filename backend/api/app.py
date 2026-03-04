@@ -20,6 +20,9 @@ from api.health import health_bp
 # Import WebSocket
 from api.websocket import socketio
 
+# Import database initialization
+from database.db_config import init_db
+
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend access
@@ -27,6 +30,13 @@ CORS(app)  # Enable CORS for frontend access
 # Configure app
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['JSON_SORT_KEYS'] = False
+
+# Initialize database (creates tables if they don't exist)
+init_db()
+
+# Seed default admin user if database is empty
+from migrations import seed_admin
+seed_admin()
 
 # Initialize SocketIO with app
 socketio.init_app(app)

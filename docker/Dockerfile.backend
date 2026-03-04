@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install system deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc libcups2-dev && \
+    gcc libffi-dev && \
     rm -rf /var/lib/apt/lists/*
 
 COPY backend/requirements.txt .
@@ -12,6 +12,9 @@ RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
 COPY backend/ .
 
+# Create directories for runtime data
+RUN mkdir -p /app/database /app/uploads
+
 EXPOSE 5000
 
-CMD ["gunicorn", "--worker-class", "eventlet", "-w", "1", "-b", "0.0.0.0:5000", "api.app:app"]
+CMD ["gunicorn", "--worker-class", "gevent", "-w", "1", "-b", "0.0.0.0:5000", "api.app:app"]
