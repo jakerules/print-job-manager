@@ -112,9 +112,45 @@ Set in `docker/docker-compose.yml` or `.env`:
 |----------|-------------|---------|
 | `JWT_SECRET_KEY` | JWT signing key | Random per restart |
 | `FLASK_ENV` | `development` or `production` | `production` |
+| `TZ` | Container timezone | `America/New_York` |
 
 ### SSL
 For HTTPS, configure your certificates in `docker/nginx.conf` or use a reverse proxy (Cloudflare, Caddy, etc.).
+
+---
+
+## TrueNAS SCALE Deployment
+
+### 1. Create a dataset
+In the TrueNAS UI: **Storage → Create Dataset** (e.g., `pool/apps/print-job-manager`).
+
+### 2. Download the TrueNAS compose file
+```bash
+cd /mnt/pool/apps/print-job-manager
+curl -O https://raw.githubusercontent.com/jakerules/print-job-manager/master/docker/docker-compose.truenas.yml
+mv docker-compose.truenas.yml docker-compose.yml
+```
+
+### 3. Set a JWT secret
+Edit `docker-compose.yml` and replace `CHANGE-ME-use-a-random-string-here` with a random string:
+```bash
+# Generate one with:
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+### 4. Start
+```bash
+docker compose up --build -d
+```
+
+### 5. Access
+Open **http://YOUR_TRUENAS_IP:9080** (port 9080 avoids conflict with TrueNAS UI).
+
+### Notes for TrueNAS
+- **Ports**: Frontend is on `9080`, backend API on `5080`. TrueNAS uses `80/443`.
+- **Data**: SQLite database and uploads are stored on ZFS at `./database/` and `./uploads/`.
+- **Backups**: Snapshot the dataset in TrueNAS for instant backup/rollback.
+- **Updates**: `docker compose up --build -d` pulls latest code from GitHub and rebuilds.
 
 ---
 
