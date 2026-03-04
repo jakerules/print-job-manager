@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from api.auth import auth_bp
 from api.users import users_bp
 from api.jobs import jobs_bp
+from api.notifications import notifications_bp
 
 # Import WebSocket
 from api.websocket import socketio
@@ -32,6 +33,7 @@ socketio.init_app(app)
 app.register_blueprint(auth_bp)
 app.register_blueprint(users_bp)
 app.register_blueprint(jobs_bp)
+app.register_blueprint(notifications_bp)
 
 
 @app.route('/')

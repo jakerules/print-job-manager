@@ -23,6 +23,7 @@ import {
   QrCodeScanner as ScannerIcon,
   AdminPanelSettings as AdminIcon,
   NoteAdd as SubmitIcon,
+  Settings as SettingsIcon,
   Menu as MenuIcon,
   AccountCircle,
 } from '@mui/icons-material'
@@ -74,6 +75,7 @@ export default function Layout() {
     { text: 'Submit Job', icon: <SubmitIcon />, path: '/submit' },
     { text: 'Queue', icon: <QueueIcon />, path: '/queue' },
     { text: 'Scanner', icon: <ScannerIcon />, path: '/scanner' },
+    { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
   ]
 
   if (user?.role === 'admin') {

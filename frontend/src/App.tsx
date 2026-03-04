@@ -9,6 +9,7 @@ import QueueManager from './components/QueueManager/QueueManager'
 import Scanner from './components/Scanner/Scanner'
 import AdminPanel from './components/AdminPanel/AdminPanel'
 import JobSubmission from './components/JobSubmission/JobSubmission'
+import NotificationPreferences from './components/Notifications/NotificationPreferences'
 import Layout from './components/common/Layout'
 import ProtectedRoute from './components/common/ProtectedRoute'
 
@@ -38,6 +39,7 @@ function App() {
               <Route path="queue" element={<QueueManager />} />
               <Route path="scanner" element={<Scanner />} />
               <Route path="submit" element={<JobSubmission />} />
+              <Route path="settings" element={<NotificationPreferences />} />
               <Route path="admin" element={<ProtectedRoute requiredRole="admin"><AdminPanel /></ProtectedRoute>} />
             </Route>
           </Routes>
