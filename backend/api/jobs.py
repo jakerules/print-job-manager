@@ -4,6 +4,8 @@ Job management routes - handles job queue, status updates, and job operations.
 from flask import Blueprint, request, jsonify
 import sys
 import os
+import secrets
+from datetime import datetime
 
 # Import the existing Google Sheets integration
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'web_app'))
@@ -16,6 +18,11 @@ from web_app.app import (
 )
 
 jobs_bp = Blueprint('jobs', __name__, url_prefix='/api/jobs')
+
+
+def generate_job_id():
+    """Generate an 8-character hex Job ID."""
+    return secrets.token_hex(4).upper()
 
 
 @jobs_bp.route('', methods=['GET'])
@@ -321,3 +328,123 @@ def get_job_stats(current_user):
         
     except Exception as e:
         return jsonify({'error': f'Failed to fetch stats: {str(e)}'}), 500
+
+
+@jobs_bp.route('/submit', methods=['POST'])
+@token_required
+def submit_job(current_user):
+    """
+    Submit a new print job directly (bypasses Google Form).
+    
+    Request body:
+        {
+            "email": "user@example.com",
+            "room": "301",
+            "quantity": 25,
+            "paper_size": "Letter",
+            "two_sided": false,
+            "color": false,
+            "stapled": false,
+            "deadline": "2024-01-15",
+            "notes": "Special instructions",
+            "file_url": "https://drive.google.com/..."
+        }
+    """
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        required = ['email', 'room', 'quantity']
+        for field in required:
+            if not data.get(field):
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+        
+        sheets_service = get_sheets_service()
+        if not sheets_service:
+            return jsonify({'error': 'Google Sheets service unavailable'}), 500
+        
+        # Generate unique Job ID
+        job_id = generate_job_id()
+        
+        # Ensure uniqueness
+        existing_row, _ = find_job_by_id(sheets_service, job_id)
+        while existing_row is not None:
+            job_id = generate_job_id()
+            existing_row, _ = find_job_by_id(sheets_service, job_id)
+        
+        timestamp = datetime.now().strftime('%m/%d/%Y %H:%M:%S')
+        
+        # Build row matching Google Form column structure
+        # Column order must match existing sheet format
+        row = [
+            timestamp,                                  # A: Timestamp
+            '',                                         # B: Staff Notes
+            data.get('email', ''),                      # C: Email
+            data.get('room', ''),                       # D: Room
+            str(data.get('quantity', 1)),                # E: Quantity
+            data.get('paper_size', 'Letter'),            # F: Paper Size
+            'Yes' if data.get('two_sided') else 'No',   # G: Two-Sided
+            'Yes' if data.get('color') else 'No',       # H: Color
+            'Yes' if data.get('stapled') else 'No',     # I: Stapled
+            data.get('deadline', ''),                    # J: Deadline
+            data.get('file_url', ''),                    # K: File URL
+            data.get('notes', ''),                       # L: User Notes
+            'FALSE',                                     # M: Acknowledged
+            'FALSE',                                     # N: Completed
+            job_id,                                      # O: Job ID
+        ]
+        
+        # Append to Google Sheet
+        sheets_service.spreadsheets().values().append(
+            spreadsheetId=SPREADSHEET_ID,
+            range=f"{SHEET_NAME}!A:O",
+            valueInputOption='USER_ENTERED',
+            insertDataOption='INSERT_ROWS',
+            body={'values': [row]}
+        ).execute()
+        
+        return jsonify({
+            'success': True,
+            'job_id': job_id,
+            'message': f'Job {job_id} submitted successfully'
+        }), 201
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to submit job: {str(e)}'}), 500
+
+
+@jobs_bp.route('/upload-file', methods=['POST'])
+@token_required
+def upload_file(current_user):
+    """
+    Upload a file for a print job.
+    Returns a Google Drive URL or local file reference.
+    """
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # For now, save locally. Google Drive upload can be added later
+        # with proper OAuth2 credentials for Drive API
+        upload_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads')
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        # Generate safe filename
+        ext = os.path.splitext(file.filename)[1]
+        safe_name = f"{secrets.token_hex(8)}{ext}"
+        filepath = os.path.join(upload_dir, safe_name)
+        file.save(filepath)
+        
+        return jsonify({
+            'success': True,
+            'file_url': f'/uploads/{safe_name}',
+            'original_name': file.filename,
+            'size': os.path.getsize(filepath)
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to upload file: {str(e)}'}), 500
