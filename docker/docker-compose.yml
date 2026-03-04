@@ -1,18 +1,26 @@
 version: "3.8"
 
+# Standalone docker-compose — builds directly from GitHub.
+# No need to clone the repository. Just run:
+#   docker compose up --build -d
+#
+# To connect Google Sheets, create these files next to docker-compose.yml:
+#   config/config.ini    — copy settings from the repo's backend/config/config.ini.example
+#   credentials.json     — your Google Service Account key
+
 services:
   backend:
     build:
-      context: ..
+      context: https://github.com/jakerules/print-job-manager.git#master
       dockerfile: docker/Dockerfile.backend
     ports:
       - "5000:5000"
     volumes:
       - db-data:/app/database
       - uploads:/app/uploads
-      # Mount Google Sheets credentials if available
-      - ./config:/app/config:ro
-      - ./credentials.json:/app/web_app/credentials.json:ro
+      # Optional: mount Google Sheets credentials (create these locally)
+      - ${CONFIG_DIR:-./config}:/app/config:ro
+      - ${CREDENTIALS_FILE:-./credentials.json}:/app/web_app/credentials.json:ro
     environment:
       - FLASK_ENV=production
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-in-production}
@@ -21,12 +29,12 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 15s
     restart: unless-stopped
 
   frontend:
     build:
-      context: ..
+      context: https://github.com/jakerules/print-job-manager.git#master
       dockerfile: docker/Dockerfile.frontend
     ports:
       - "80:80"

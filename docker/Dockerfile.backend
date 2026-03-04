@@ -2,17 +2,16 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc libffi-dev && \
     rm -rf /var/lib/apt/lists/*
 
+# Copy backend from build context (repo root)
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
 COPY backend/ .
 
-# Create directories for runtime data
 RUN mkdir -p /app/database /app/uploads
 
 EXPOSE 5000

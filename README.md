@@ -2,118 +2,96 @@
 
 A modular print job management and tracking program built on top of the copy-form functionality with a modern React-based web interface, real-time notifications, and role-based access control.
 
-## 🎉 Current Status: Core Implementation Complete!
+## Quick Start (Docker — no clone needed)
 
-✅ **Backend API** - 25+ REST API endpoints + WebSocket support  
-✅ **Frontend** - React + TypeScript SPA with all core components  
-✅ **Docker** - Containerized deployment ready  
-⏳ **Testing** - Requires Node.js install to build frontend
+Just download the compose file and run:
+
+```bash
+# Download the compose file
+curl -O https://raw.githubusercontent.com/jakerules/print-job-manager/master/docker/docker-compose.yml
+
+# Start the app (Docker fetches and builds everything from GitHub)
+docker compose up --build -d
+```
+
+Then open **http://localhost** and log in with `admin` / `admin123`.
+
+### Optional: Connect Google Sheets
+
+Create a `config/` directory and `credentials.json` next to `docker-compose.yml`:
+
+```
+my-folder/
+├── docker-compose.yml
+├── credentials.json          ← Google Service Account key
+└── config/
+    └── config.ini            ← your spreadsheet ID + settings
+```
+
+`config.ini` example:
+```ini
+[Google]
+spreadsheet_id = YOUR_SPREADSHEET_ID_HERE
+sheet_name = Form Responses 1
+
+[Columns]
+google_drive_link = 0
+quantity = 1
+two_sided = 2
+paper_size = 3
+staples = 4
+hole_punch = 5
+date_submitted = 6
+job_deadline = 7
+processed = 8
+acknowledged = 12
+completed = 13
+error_log = 21
+```
+
+Then restart: `docker compose up --build -d`
+
+Without these files the app still runs — just without live Google Sheets job data.
+
+## Development Setup (local)
+
+```bash
+git clone https://github.com/jakerules/print-job-manager.git
+cd print-job-manager
+
+# Backend
+cd backend && python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt && python3 api/app.py
+
+# Frontend (separate terminal)
+cd frontend && npm install && npm run dev
+```
 
 ## Features
 
-### ✅ Dashboard
-- Real-time stat cards (pending, in-progress, completed)
-- Recent jobs list with status chips
-- Notifications panel with unread badge
-- Completion rate progress bar (Manager+)
-- Quick action buttons (Scan, Queue, Refresh)
-- Role-based visibility controls
-
-### ✅ Job Queue Manager
-- Searchable/filterable job table
-- Job detail modal with full info
-- Bulk select and complete operations
-- CSV export of job list
-- Real-time WebSocket updates
-- Responsive columns (mobile-friendly)
-
-### ✅ Barcode Scanner
-- Manual/barcode entry with auto-uppercase
-- Auto-update status on scan (pending→acknowledged→completed)
-- Continuous scanning mode
-- Scan history (last 50)
-- Audio feedback on success/error
-- Manual status override buttons
-
-### ✅ Direct Job Submission
-- Web-based form (bypasses Google Forms)
-- Server-generated 8-char hex Job IDs
-- File upload support
-- Success page with tracking ID
-- Works alongside existing Google Form method
-
-### ✅ Admin Panel
-- User CRUD with table view
-- Create/edit/delete user dialogs
-- Role assignment (admin/manager/staff/submitter)
-- Active/disabled user toggle
-- System settings tab
-
-### ✅ Authentication & Security
-- JWT access + refresh tokens
-- 4 user roles with hierarchy
-- Bcrypt password hashing
-- Protected routes (frontend + backend)
-- Audit logging capability
-
-## Quick Start
-
-### Backend
-```bash
-cd backend
-source venv/bin/activate
-python3 api/app.py
-```
-
-### Frontend (requires Node.js 18+)
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-### Docker
-```bash
-cd docker
-docker-compose up --build
-```
-
-**Default Credentials:** admin / admin123
+- **Dashboard** — Real-time stats, recent jobs, notifications, completion rate, quick actions
+- **Job Queue** — Searchable table, detail modal, bulk complete, CSV export, WebSocket updates
+- **Barcode Scanner** — USB/Bluetooth + camera scanning, continuous mode, audio feedback, scan history
+- **Job Submission** — Web form that writes directly to Google Sheets alongside Google Forms
+- **Job Timeline** — Visual timeline view with status icons and filtering
+- **Admin Panel** — User CRUD, role assignment, activity log, system health, settings
+- **Notifications** — WebSocket real-time, browser push, Do Not Disturb with quiet hours
+- **Auth** — JWT tokens, 4 roles (admin/manager/staff/submitter), bcrypt passwords
 
 ## Architecture
 
 ```
-React SPA ←→ Flask API ←→ Google Sheets
-   ↕              ↕
-Socket.IO     SQLite (users)
+React SPA ←→ Nginx ←→ Flask API ←→ Google Sheets
+   ↕                      ↕
+Socket.IO              SQLite (users/auth/audit)
 ```
 
-- **Frontend:** React 18, TypeScript, Vite, MUI, Redux Toolkit, Socket.IO client
-- **Backend:** Flask, Flask-SocketIO, JWT, bcrypt, Google Sheets API
-- **Database:** SQLite (users/auth) + Google Sheets (jobs)
-- **Deploy:** Docker + Nginx reverse proxy
-
-## Project Structure
-
-```
-print-job-manager/
-├── backend/
-│   ├── api/              # Flask API (app, auth, jobs, users, websocket)
-│   ├── database/         # SQLite database
-│   ├── src/              # Original print processing logic
-│   ├── web_app/          # Original copy-form (imported by jobs.py)
-│   └── venv/             # Python virtual environment
-├── frontend/
-│   └── src/
-│       ├── components/   # Dashboard, QueueManager, Scanner, AdminPanel, JobSubmission
-│       ├── services/     # API client, auth, jobs, websocket
-│       ├── store/        # Redux (auth, jobs)
-│       └── types/        # TypeScript interfaces
-├── docker/               # Dockerfiles + docker-compose + nginx
-├── docs/                 # API.md, DEPLOYMENT.md
-├── GETTING_STARTED.md
-└── README.md
-```
+| Layer | Tech |
+|-------|------|
+| Frontend | React 18, TypeScript, Vite, Material UI, Redux Toolkit, Socket.IO |
+| Backend | Flask, Flask-SocketIO, JWT, bcrypt, Google Sheets API |
+| Database | SQLite (users, auth, audit) + Google Sheets (jobs) |
+| Deploy | Docker, Nginx reverse proxy, Gunicorn + gevent |
 
 ## API Endpoints
 
@@ -125,24 +103,19 @@ print-job-manager/
 | GET | /api/jobs/:id | Get job details |
 | POST | /api/jobs/submit | Submit new job |
 | POST | /api/jobs/upload-file | Upload print file |
-| PUT | /api/jobs/:id/status | Update status |
-| PUT | /api/jobs/:id/notes | Update notes |
+| PUT | /api/jobs/:id/status | Update job status |
 | GET | /api/jobs/stats | Job statistics |
 | GET/POST/PUT/DELETE | /api/users/* | User CRUD (admin) |
+| GET/PUT | /api/notifications/preferences | Notification settings |
+| GET/POST | /api/audit/log | Activity log |
+| GET | /api/system/health | Health check (public) |
+| GET | /api/system/status | System status (manager+) |
 
 See [docs/API.md](docs/API.md) for full reference.
-
-## Progress
-
-- ✅ 69 tasks complete
-- ⏳ 37 tasks remaining (mostly testing, deployment polish, optional features)
-- 📊 65% complete
-
-**Phases Complete:** 1-8.5 (Backend + Frontend + Job Submission)  
-**Remaining:** Testing, deployment polish, optional features (camera scan, email notifications, etc.)
 
 ## Documentation
 
 - [Getting Started](GETTING_STARTED.md)
 - [API Reference](docs/API.md)
+- [Admin Guide](docs/ADMIN_GUIDE.md)
 - [Deployment Guide](docs/DEPLOYMENT.md)
