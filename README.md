@@ -4,14 +4,13 @@ A modular print job management and tracking program built on top of the copy-for
 
 ## Quick Start (Docker — no clone needed)
 
-Just download the compose file and run:
+Download the compose file and run — images are pre-built by GitHub Actions:
 
 ```bash
-# Download the compose file
 curl -O https://raw.githubusercontent.com/jakerules/print-job-manager/master/docker/docker-compose.yml
 
-# Start the app (Docker fetches and builds everything from GitHub)
-docker compose up --build -d
+# Start (pulls pre-built images from GitHub Container Registry)
+docker compose up -d
 ```
 
 Then open **http://localhost** and log in with `admin` / `admin123`.

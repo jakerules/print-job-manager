@@ -140,7 +140,7 @@ python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 
 ### 4. Start
 ```bash
-docker compose up --build -d
+docker compose up -d
 ```
 
 ### 5. Access
@@ -150,7 +150,7 @@ Open **http://YOUR_TRUENAS_IP:9080** (port 9080 avoids conflict with TrueNAS UI)
 - **Ports**: Frontend is on `9080`, backend API on `5080`. TrueNAS uses `80/443`.
 - **Data**: SQLite database and uploads are stored on ZFS at `./database/` and `./uploads/`.
 - **Backups**: Snapshot the dataset in TrueNAS for instant backup/rollback.
-- **Updates**: `docker compose up --build -d` pulls latest code from GitHub and rebuilds.
+- **Updates**: `docker compose pull && docker compose up -d` pulls the latest images built by GitHub Actions.
 
 ---
 
