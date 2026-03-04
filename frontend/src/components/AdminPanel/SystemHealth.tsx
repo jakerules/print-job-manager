@@ -6,6 +6,8 @@ import {
   Chip,
   Divider,
   CircularProgress,
+  Button,
+  Alert,
 } from '@mui/material'
 import {
   CheckCircle,
@@ -33,6 +35,8 @@ export default function SystemHealth() {
   const [status, setStatus] = useState<SystemStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [sheetsTest, setSheetsTest] = useState<{ message?: string; error?: string } | null>(null)
+  const [testingSheets, setTestingSheets] = useState(false)
 
   useEffect(() => {
     api.get('/api/system/status')
@@ -40,6 +44,19 @@ export default function SystemHealth() {
       .catch(() => setError(true))
       .finally(() => setLoading(false))
   }, [])
+
+  const testSheetsConnection = async () => {
+    setTestingSheets(true)
+    setSheetsTest(null)
+    try {
+      const res = await api.post('/api/system/test-sheets')
+      setSheetsTest(res.data)
+    } catch {
+      setSheetsTest({ error: 'Request failed' })
+    } finally {
+      setTestingSheets(false)
+    }
+  }
 
   const formatUptime = (secs: number) => {
     const d = Math.floor(secs / 86400)
@@ -105,12 +122,22 @@ export default function SystemHealth() {
           <Cloud color="primary" />
           <Box flexGrow={1}>
             <Typography variant="body2" color="text.secondary">Google Sheets</Typography>
-            <Chip
-              icon={status.google_sheets.status === 'connected' ? <CheckCircle /> : <ErrorIcon />}
-              label={status.google_sheets.status}
-              color={status.google_sheets.status === 'connected' ? 'success' : 'warning'}
-              size="small"
-            />
+            <Box display="flex" gap={1} alignItems="center">
+              <Chip
+                icon={status.google_sheets.status === 'connected' ? <CheckCircle /> : <ErrorIcon />}
+                label={status.google_sheets.status}
+                color={status.google_sheets.status === 'connected' ? 'success' : 'warning'}
+                size="small"
+              />
+              <Button size="small" variant="outlined" onClick={testSheetsConnection} disabled={testingSheets}>
+                {testingSheets ? 'Testing...' : 'Test Connection'}
+              </Button>
+            </Box>
+            {sheetsTest && (
+              <Alert severity={sheetsTest.error ? 'error' : 'success'} sx={{ mt: 1 }}>
+                {sheetsTest.message || sheetsTest.error}
+              </Alert>
+            )}
           </Box>
         </Box>
 

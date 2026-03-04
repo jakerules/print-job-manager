@@ -71,3 +71,25 @@ def system_status(current_user):
             'uploads_dir': os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads')),
         },
     }), 200
+
+
+@health_bp.route('/test-sheets', methods=['POST'])
+@token_required
+@role_required('admin')
+def test_sheets_connection(current_user):
+    """Test Google Sheets connectivity (Admin only)."""
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), 'web_app'))
+        from web_app.app import get_sheets_service, get_sheet_data
+        svc = get_sheets_service()
+        if svc is None:
+            return jsonify({'success': False, 'error': 'Could not initialize Sheets service. Check credentials.json and config.ini.'}), 200
+        data = get_sheet_data()
+        row_count = len(data) if data else 0
+        return jsonify({
+            'success': True,
+            'message': f'Connected successfully. Found {row_count} rows.',
+            'row_count': row_count,
+        }), 200
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 200
