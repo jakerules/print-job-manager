@@ -4,14 +4,23 @@ A modular print job management and tracking program built on top of the copy-for
 
 ## Quick Start (Docker — no clone needed)
 
-Download the compose file and run — images are pre-built by GitHub Actions:
+**Option A: Build from source** (recommended — works everywhere, no registry auth):
+
+```bash
+curl -O https://raw.githubusercontent.com/jakerules/print-job-manager/master/docker/docker-compose.build.yml
+docker compose -f docker-compose.build.yml up -d
+```
+
+**Option B: Pull pre-built images** (faster, requires packages to be public):
 
 ```bash
 curl -O https://raw.githubusercontent.com/jakerules/print-job-manager/master/docker/docker-compose.yml
-
-# Start (pulls pre-built images from GitHub Container Registry)
 docker compose up -d
 ```
+
+> **Note:** If Option B fails with auth errors, the GHCR packages may be private.
+> Make them public at: https://github.com/jakerules?tab=packages → click each package → Package settings → Change visibility → Public.
+> Or just use Option A.
 
 Then open **http://localhost** and log in with `admin` / `admin123`.
 
