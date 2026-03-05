@@ -11,9 +11,8 @@
 # If GHCR images are outdated, build and push from a workstation first,
 # or use the TrueNAS CLI directly with docker-compose.build.yml.
 #
-# Optional — Google Sheets integration:
-#   Mount config.ini and credentials.json via the TrueNAS storage UI,
-#   then uncomment the two volume lines below and redeploy.
+# Google Sheets integration is configured entirely from the web UI
+# (App Settings page). No file mounts needed.
 
 services:
   backend:
@@ -23,9 +22,6 @@ services:
     volumes:
       - ./database:/data/db
       - ./uploads:/app/uploads
-      # Uncomment BOTH lines below for Google Sheets integration:
-      # - ./config:/app/config:ro
-      # - ./credentials.json:/app/web_app/credentials.json:ro
     environment:
       - FLASK_ENV=production
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-in-production}

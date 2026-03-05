@@ -1,20 +1,18 @@
 """
 Reusable Google Sheets client.
 
-Extracts auth and read/write logic from web_app/app.py so sync_service
-can use Sheets without importing the Flask web_app (which crashes if
-config.ini is missing).
+Reads all configuration (credentials, token, spreadsheet_id, sheet_name)
+from the settings DB table — no filesystem files needed.
 
-Reads spreadsheet_id / sheet_name from the settings DB table.
-Uses existing OAuth token.json credentials flow.
+Supports a web-based OAuth flow so admins can authorize from the browser.
 """
-import os
+import json
 import logging
 from typing import Optional, List, Tuple
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 
 from api.settings_repository import SettingsRepository
@@ -24,12 +22,11 @@ logger = logging.getLogger(__name__)
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 # Column layout matching the Google Form / Sheet structure
-# (same as web_app/app.py)
 TIMESTAMP_COL = 0       # A
 STAFF_NOTES_COL = 1     # B
 EMAIL_COL = 2           # C
-ROOM_COL = 9            # J  (Google Form puts room at col 9)
-QUANTITY_COL = 1         # will be overridden from config
+ROOM_COL = 9            # J
+QUANTITY_COL = 1
 TWO_SIDED_COL = 2
 PAPER_SIZE_COL = 3
 DATE_SUBMITTED_COL = 6
@@ -39,7 +36,6 @@ ACKNOWLEDGED_COL = 12   # M
 COMPLETED_COL = 13      # N
 JOB_ID_COL = 14         # O
 
-# Hardcoded column map matching config.ini.example defaults
 DEFAULT_COLUMN_MAP = {
     'google_drive_link': 0,
     'quantity': 1,
@@ -54,46 +50,117 @@ DEFAULT_COLUMN_MAP = {
     'completed': 13,
 }
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
 _sheets_service = None
 
 
+# ── Credentials from DB ─────────────────────────────────────────────
+
 def _get_credentials():
-    """Load or refresh Google OAuth credentials."""
-    creds = None
+    """Load or refresh Google OAuth credentials from the DB settings table."""
+    sr = SettingsRepository()
+    token_json = sr.get('google_token_json')
+    if not token_json:
+        logger.info("No Google token stored — run OAuth flow from Settings UI")
+        return None
 
-    credentials_dir = os.path.join(PROJECT_ROOT, 'credentials')
-    if os.path.exists(credentials_dir):
-        token_path = os.path.join(credentials_dir, 'token.json')
-        credentials_path = os.path.join(credentials_dir, 'credentials.json')
-    else:
-        token_path = os.path.join(PROJECT_ROOT, 'token.json')
-        credentials_path = os.path.join(PROJECT_ROOT, 'credentials.json')
+    try:
+        creds = Credentials.from_authorized_user_info(json.loads(token_json), SCOPES)
+    except Exception as e:
+        logger.error(f"Invalid stored token: {e}")
+        return None
 
-    if os.path.exists(token_path):
-        creds = Credentials.from_authorized_user_file(token_path, SCOPES)
-
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
+    if not creds.valid:
+        if creds.expired and creds.refresh_token:
             try:
                 creds.refresh(Request())
+                # Persist refreshed token back to DB
+                sr.set('google_token_json', creds.to_json(), category='google')
             except Exception as e:
-                logger.error(f"Failed to refresh credentials: {e}")
+                logger.error(f"Failed to refresh token: {e}")
                 return None
         else:
-            if not os.path.exists(credentials_path):
-                logger.warning("credentials.json not found — Sheets sync disabled")
-                return None
-            logger.warning("Running OAuth flow (requires interactive terminal)")
-            flow = InstalledAppFlow.from_client_secrets_file(credentials_path, SCOPES)
-            creds = flow.run_local_server(port=0)
+            logger.warning("Token invalid and cannot be refreshed — re-authorize from Settings")
+            return None
 
-        try:
-            with open(token_path, 'w') as f:
-                f.write(creds.to_json())
-        except Exception as e:
-            logger.error(f"Failed to save token: {e}")
+    return creds
+
+
+def _get_client_config() -> Optional[dict]:
+    """Return the OAuth client config dict stored in DB (credentials.json content)."""
+    sr = SettingsRepository()
+    raw = sr.get('google_credentials_json')
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+        # credentials.json wraps under "installed" or "web" key
+        if 'installed' in data:
+            return data
+        if 'web' in data:
+            return data
+        # Bare client config — wrap it
+        return {'installed': data}
+    except (json.JSONDecodeError, TypeError):
+        return None
+
+
+def build_oauth_url(redirect_uri: str) -> Optional[str]:
+    """Generate the Google OAuth authorization URL for the web flow.
+
+    Args:
+        redirect_uri: The URL Google will redirect back to after auth
+                      (e.g. https://printjob1.jgrossman.me/api/sync/oauth/callback)
+
+    Returns:
+        The authorization URL string, or None if credentials.json isn't configured.
+    """
+    client_config = _get_client_config()
+    if not client_config:
+        return None
+
+    flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=redirect_uri)
+    auth_url, _ = flow.authorization_url(
+        access_type='offline',
+        include_granted_scopes='true',
+        prompt='consent',
+    )
+    return auth_url
+
+
+def exchange_code(code: str, redirect_uri: str) -> bool:
+    """Exchange an OAuth authorization code for tokens and store in DB.
+
+    Returns True on success.
+    """
+    client_config = _get_client_config()
+    if not client_config:
+        return False
+
+    try:
+        flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=redirect_uri)
+        flow.fetch_token(code=code)
+        creds = flow.credentials
+        # Store token JSON in DB
+        sr = SettingsRepository()
+        sr.set('google_token_json', creds.to_json(), category='google')
+        reset_service()  # force rebuild with new creds
+        logger.info("Google OAuth token stored successfully")
+        return True
+    except Exception as e:
+        logger.error(f"OAuth code exchange failed: {e}")
+        return False
+
+
+def is_connected() -> bool:
+    """Check whether we have valid (or refreshable) Google credentials."""
+    return _get_credentials() is not None
+
+
+def disconnect():
+    """Remove stored token (admin wants to re-authorize or disconnect)."""
+    sr = SettingsRepository()
+    sr.set('google_token_json', '', category='google')
+    reset_service()
 
     return creds
 

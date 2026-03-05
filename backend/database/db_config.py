@@ -128,6 +128,8 @@ def init_db():
         defaults = [
             ('spreadsheet_id', '', 'google'),
             ('sheet_name', 'Sheet1', 'google'),
+            ('google_credentials_json', '', 'google'),
+            ('google_token_json', '', 'google'),
             ('adobe_reader_path', '', 'printing'),
             ('cover_sheet_printer', '', 'printing'),
             ('pdf_printer', '', 'printing'),
@@ -148,6 +150,18 @@ def init_db():
         cursor.executemany(
             "INSERT INTO settings (key, value, category) VALUES (?, ?, ?)",
             defaults,
+        )
+        conn.commit()
+
+    # Migration: add Google OAuth settings if missing
+    cursor.execute("SELECT COUNT(*) FROM settings WHERE key = 'google_credentials_json'")
+    if cursor.fetchone()[0] == 0:
+        cursor.executemany(
+            "INSERT OR IGNORE INTO settings (key, value, category) VALUES (?, ?, ?)",
+            [
+                ('google_credentials_json', '', 'google'),
+                ('google_token_json', '', 'google'),
+            ],
         )
         conn.commit()
 

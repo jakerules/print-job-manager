@@ -27,6 +27,7 @@ interface SyncStatus {
   last_sync_jobs_pulled: number
   last_sync_jobs_pushed: number
   sheets_configured: boolean
+  google_connected: boolean
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -46,6 +47,12 @@ const BOOLEAN_KEYS = new Set([
   'browser_push_notifications',
   'email_notifications',
   'sound_alerts',
+])
+
+// These keys are managed by the OAuth / Sync section — hide from the generic form
+const HIDDEN_KEYS = new Set([
+  'google_credentials_json',
+  'google_token_json',
 ])
 
 const LABEL_OVERRIDES: Record<string, string> = {
@@ -162,6 +169,43 @@ export default function SettingsPanel() {
     }
   }
 
+  const handleConnectGoogle = async () => {
+    try {
+      const res = await apiService.post<{ success: boolean; auth_url?: string; error?: string }>('/sync/oauth/start', {})
+      if (res.success && res.auth_url) {
+        window.open(res.auth_url, '_blank')
+      } else {
+        setSnackbar({ open: true, message: res.error || 'Failed to start OAuth', severity: 'error' })
+      }
+    } catch {
+      setSnackbar({ open: true, message: 'Failed to start Google authorization', severity: 'error' })
+    }
+  }
+
+  const handleDisconnectGoogle = async () => {
+    try {
+      await apiService.post('/sync/oauth/disconnect', {})
+      loadSyncStatus()
+      setSnackbar({ open: true, message: 'Google Sheets disconnected', severity: 'success' })
+    } catch {
+      setSnackbar({ open: true, message: 'Failed to disconnect', severity: 'error' })
+    }
+  }
+
+  // Handle OAuth redirect query params
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('oauth_success') === '1') {
+      setSnackbar({ open: true, message: 'Google Sheets connected successfully!', severity: 'success' })
+      loadSyncStatus()
+      window.history.replaceState({}, '', window.location.pathname)
+    } else if (params.get('oauth_error')) {
+      setSnackbar({ open: true, message: `Google OAuth error: ${params.get('oauth_error')}`, severity: 'error' })
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   if (loading) {
     return <Box display="flex" justifyContent="center" py={4}><CircularProgress /></Box>
   }
@@ -184,7 +228,7 @@ export default function SettingsPanel() {
           </Typography>
           <Divider sx={{ mb: 2 }} />
           <Box display="flex" flexDirection="column" gap={2}>
-            {Object.entries(settings[category]).map(([key, value]) =>
+            {Object.entries(settings[category]).filter(([key]) => !HIDDEN_KEYS.has(key)).map(([key, value]) =>
               BOOLEAN_KEYS.has(key) ? (
                 <FormControlLabel
                   key={key}
@@ -215,12 +259,71 @@ export default function SettingsPanel() {
         <Alert severity="info">No settings found. Settings will appear after the backend initializes.</Alert>
       )}
 
-      {/* Google Sheets Sync Section */}
+      {/* Google Sheets Connection & Sync Section */}
       <Paper sx={{ p: 3, mb: 2 }}>
         <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-          Google Sheets Sync
+          Google Sheets Connection
         </Typography>
         <Divider sx={{ mb: 2 }} />
+
+        {/* Step 1: Credentials JSON */}
+        <Typography variant="body2" color="text.secondary" mb={1}>
+          Paste the contents of your Google Cloud OAuth <code>credentials.json</code> file below.
+          You can get this from the{' '}
+          <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">
+            Google Cloud Console
+          </a>{' '}
+          → OAuth 2.0 Client IDs → Download JSON.
+        </Typography>
+        <TextField
+          label="credentials.json contents"
+          value={settings.google?.google_credentials_json || ''}
+          onChange={(e) => handleChange('google', 'google_credentials_json', e.target.value)}
+          size="small"
+          fullWidth
+          multiline
+          minRows={2}
+          maxRows={6}
+          placeholder='{"installed":{"client_id":"...","client_secret":"..."}}'
+          sx={{ mb: 2, fontFamily: 'monospace' }}
+        />
+
+        {/* Step 2: Connect / Disconnect */}
+        {syncStatus && (
+          <Box display="flex" alignItems="center" gap={2} mb={2}>
+            {syncStatus.google_connected ? (
+              <>
+                <Chip label="Connected" color="success" size="small" />
+                <Button variant="outlined" color="error" size="small" onClick={handleDisconnectGoogle}>
+                  Disconnect
+                </Button>
+              </>
+            ) : (
+              <>
+                <Chip label="Not connected" color="default" size="small" />
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={handleConnectGoogle}
+                  disabled={!settings.google?.google_credentials_json}
+                >
+                  Connect Google Sheets
+                </Button>
+                {!settings.google?.google_credentials_json && (
+                  <Typography variant="caption" color="text.secondary">
+                    Paste credentials above &amp; save, then connect
+                  </Typography>
+                )}
+              </>
+            )}
+          </Box>
+        )}
+
+        <Divider sx={{ my: 2 }} />
+        <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+          Sync Controls
+        </Typography>
+
         {syncStatus ? (
           <Box display="flex" flexDirection="column" gap={2}>
             <Box display="flex" alignItems="center" gap={2}>
@@ -244,6 +347,11 @@ export default function SettingsPanel() {
                 Set the <strong>Spreadsheet ID</strong> in the Google Sheets settings above to enable sync.
               </Alert>
             )}
+            {!syncStatus.google_connected && syncStatus.sheets_configured && (
+              <Alert severity="warning" sx={{ mb: 1 }}>
+                Connect your Google account above before syncing.
+              </Alert>
+            )}
             {syncStatus.last_sync_time && (
               <Typography variant="body2" color="text.secondary">
                 Last sync: {new Date(syncStatus.last_sync_time).toLocaleString()}
@@ -259,7 +367,7 @@ export default function SettingsPanel() {
                 variant="outlined"
                 startIcon={syncing ? <CircularProgress size={18} /> : <Sync />}
                 onClick={handleSyncNow}
-                disabled={syncing || !syncStatus.sheets_configured}
+                disabled={syncing || !syncStatus.sheets_configured || !syncStatus.google_connected}
               >
                 {syncing ? 'Syncing…' : 'Sync Now'}
               </Button>
