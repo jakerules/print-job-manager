@@ -17,7 +17,7 @@
 
 services:
   backend:
-    image: ghcr.io/jakerules/print-job-manager/backend:9a064054e609801c658855fe92d3da1ad3de99ab
+    image: ghcr.io/jakerules/print-job-manager/backend:latest
     ports:
       - "5080:5000"
     volumes:
@@ -40,7 +40,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: ghcr.io/jakerules/print-job-manager/frontend:9a064054e609801c658855fe92d3da1ad3de99ab
+    image: ghcr.io/jakerules/print-job-manager/frontend:latest
     ports:
       - "9080:80"
     depends_on:

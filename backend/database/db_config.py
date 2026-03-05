@@ -77,6 +77,39 @@ def init_db():
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     ''')
+
+    # Jobs table — local job storage (replaces Google Sheets dependency)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS jobs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_id VARCHAR(8) UNIQUE NOT NULL,
+            email VARCHAR(120) NOT NULL,
+            room VARCHAR(50) NOT NULL,
+            quantity INTEGER DEFAULT 1,
+            paper_size VARCHAR(20) DEFAULT 'Letter',
+            two_sided BOOLEAN DEFAULT FALSE,
+            color BOOLEAN DEFAULT FALSE,
+            stapled BOOLEAN DEFAULT FALSE,
+            deadline VARCHAR(50),
+            notes TEXT,
+            staff_notes TEXT,
+            file_url TEXT,
+            acknowledged BOOLEAN DEFAULT FALSE,
+            completed BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
+    # Settings table — key-value app configuration (replaces config.ini)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS settings (
+            key VARCHAR(100) PRIMARY KEY,
+            value TEXT NOT NULL,
+            category VARCHAR(50) DEFAULT 'general',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
     
     conn.commit()
 
@@ -87,6 +120,35 @@ def init_db():
         cursor.execute("ALTER TABLE notification_preferences ADD COLUMN dnd_enabled BOOLEAN DEFAULT FALSE")
         cursor.execute("ALTER TABLE notification_preferences ADD COLUMN dnd_start VARCHAR(5) DEFAULT '22:00'")
         cursor.execute("ALTER TABLE notification_preferences ADD COLUMN dnd_end VARCHAR(5) DEFAULT '07:00'")
+        conn.commit()
+
+    # Seed default settings if the table is empty
+    cursor.execute("SELECT COUNT(*) FROM settings")
+    if cursor.fetchone()[0] == 0:
+        defaults = [
+            ('spreadsheet_id', '', 'google'),
+            ('sheet_name', 'Sheet1', 'google'),
+            ('adobe_reader_path', '', 'printing'),
+            ('cover_sheet_printer', '', 'printing'),
+            ('pdf_printer', '', 'printing'),
+            ('receipt_printer', '', 'printing'),
+            ('bypass_receipt_printer', 'false', 'printing'),
+            ('bypass_pdf_printer', 'false', 'printing'),
+            ('poll_interval', '10', 'script'),
+            ('cleanup_after_processing', 'true', 'script'),
+            ('cleanup_delay_minutes', '10', 'script'),
+            ('enable_footer', 'true', 'footer'),
+            ('footer_font_size', '6', 'footer'),
+            ('footer_font_family', 'Times-Roman', 'footer'),
+            ('websocket_notifications', 'true', 'notifications'),
+            ('browser_push_notifications', 'true', 'notifications'),
+            ('email_notifications', 'false', 'notifications'),
+            ('sound_alerts', 'true', 'notifications'),
+        ]
+        cursor.executemany(
+            "INSERT INTO settings (key, value, category) VALUES (?, ?, ?)",
+            defaults,
+        )
         conn.commit()
 
     conn.close()

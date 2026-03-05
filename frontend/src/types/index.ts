@@ -27,10 +27,13 @@ export interface Job {
   quantity: string
   paper_size: string
   two_sided: string
+  color?: string
+  stapled?: string
   date_submitted: string
   job_deadline: string
   staff_notes: string
   user_notes: string
+  file_url?: string
   status: {
     acknowledged: boolean
     completed: boolean

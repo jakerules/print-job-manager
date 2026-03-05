@@ -27,6 +27,7 @@ import {
   Menu as MenuIcon,
   AccountCircle,
   Timeline as TimelineIcon,
+  Tune as AppSettingsIcon,
 } from '@mui/icons-material'
 import { useState } from 'react'
 import { RootState } from '../../store/store'
@@ -82,6 +83,7 @@ export default function Layout() {
 
   if (user?.role === 'admin') {
     menuItems.push({ text: 'Admin', icon: <AdminIcon />, path: '/admin' })
+    menuItems.push({ text: 'App Settings', icon: <AppSettingsIcon />, path: '/app-settings' })
   }
 
   // Only staff+ can see scanner

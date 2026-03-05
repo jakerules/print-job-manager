@@ -34,6 +34,7 @@ import { authService } from '../../services/auth'
 import api from '../../services/api'
 import AuditLogViewer from './AuditLogViewer'
 import SystemHealth from './SystemHealth'
+import SettingsPanel from './SettingsPanel'
 
 interface User {
   id: number
@@ -196,22 +197,7 @@ export default function AdminPanel() {
       {tab === 2 && <SystemHealth />}
 
       {/* Settings Tab */}
-      {tab === 3 && (
-        <Paper sx={{ p: 3 }}>
-          <Typography variant="h6" gutterBottom>System Settings</Typography>
-          <Alert severity="info" sx={{ mb: 2 }}>
-            System settings are configured via <code>config.ini</code> and <code>.env</code> files.
-            Restart the backend after changes.
-          </Alert>
-          <Box display="flex" flexDirection="column" gap={2}>
-            <Typography variant="subtitle2">Features</Typography>
-            <FormControlLabel control={<Switch defaultChecked />} label="WebSocket Notifications" />
-            <FormControlLabel control={<Switch defaultChecked />} label="Browser Push Notifications" />
-            <FormControlLabel control={<Switch />} label="Email Notifications" />
-            <FormControlLabel control={<Switch defaultChecked />} label="Sound Alerts" />
-          </Box>
-        </Paper>
-      )}
+      {tab === 3 && <SettingsPanel />}
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
