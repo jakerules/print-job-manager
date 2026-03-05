@@ -1,24 +1,25 @@
 # TrueNAS SCALE docker-compose
 # =============================
-# 1. Place this file in /mnt/HDDs/Applications/print-job-manager/
-# 2. Run:  docker compose up -d
+# For use with TrueNAS Apps → Custom App (Docker Compose).
+# Paste this into the compose editor or place in the app dataset.
+#
+# 1. In TrueNAS: Apps → Discover → Custom App
+# 2. Paste this compose config
 # 3. App will be at http://<truenas-ip>:9080
 #
-# To build from source instead of pulling GHCR images:
-#   docker compose build --no-cache && docker compose up -d
+# NOTE: TrueNAS Apps only supports pulling images (no build).
+# If GHCR images are outdated, build and push from a workstation first,
+# or use the TrueNAS CLI directly with docker-compose.build.yml.
 #
 # Optional — Google Sheets integration:
-#   mkdir -p config && cp config.ini config/ && cp credentials.json .
-#   Then uncomment the two volume lines below and restart.
+#   Mount config.ini and credentials.json via the TrueNAS storage UI,
+#   then uncomment the two volume lines below and redeploy.
 
 services:
   backend:
     image: ghcr.io/jakerules/print-job-manager/backend:latest
-    build:
-      context: https://github.com/jakerules/print-job-manager.git#master
-      dockerfile: docker/Dockerfile.backend
     ports:
-      - "${BACKEND_PORT:-5080}:5000"
+      - "5080:5000"
     volumes:
       - ./database:/data/db
       - ./uploads:/app/uploads
@@ -40,12 +41,8 @@ services:
 
   frontend:
     image: ghcr.io/jakerules/print-job-manager/frontend:latest
-    build:
-      context: https://github.com/jakerules/print-job-manager.git#master
-      dockerfile: docker/Dockerfile.frontend
     ports:
-      - "${FRONTEND_PORT:-9080}:80"
+      - "9080:80"
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     restart: unless-stopped
