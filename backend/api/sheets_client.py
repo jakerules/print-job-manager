@@ -161,14 +161,14 @@ def build_oauth_url(redirect_uri: str) -> Optional[tuple]:
     return auth_url, 'redirect'
 
 
-def exchange_code(code: str, redirect_uri: str) -> bool:
+def exchange_code(code: str, redirect_uri: str) -> tuple:
     """Exchange an OAuth authorization code for tokens and store in DB.
 
-    Returns True on success.
+    Returns (True, None) on success or (False, error_message) on failure.
     """
     client_config = _get_client_config()
     if not client_config:
-        return False
+        return False, 'No client credentials configured'
 
     web_config = _coerce_to_web_config(client_config, redirect_uri)
 
@@ -181,10 +181,12 @@ def exchange_code(code: str, redirect_uri: str) -> bool:
         sr.set('google_token_json', creds.to_json(), category='google')
         reset_service()  # force rebuild with new creds
         logger.info("Google OAuth token stored successfully")
-        return True
+        return True, None
     except Exception as e:
         logger.error(f"OAuth code exchange failed: {e}")
-        return False
+        logger.error(f"  redirect_uri used: {redirect_uri}")
+        logger.error(f"  client type: {'web' if 'web' in client_config else 'installed'}")
+        return False, str(e)
 
 
 def is_connected() -> bool:

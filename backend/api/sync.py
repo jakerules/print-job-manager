@@ -2,7 +2,7 @@
 Sync API routes — manual trigger, status, toggle, and OAuth flow for Google Sheets.
 """
 import os
-from flask import Blueprint, request, jsonify, redirect
+from flask import Blueprint, request, jsonify, redirect, session
 from urllib.parse import urljoin
 
 # Allow OAuth over HTTP in dev / behind TLS-terminating proxy
@@ -81,11 +81,7 @@ def sync_toggle(current_user):
 @token_required
 @role_required('admin')
 def oauth_start(current_user):
-    """Generate a Google OAuth authorization URL.
-
-    Returns auth_url and flow_type ('redirect' or 'manual').
-    For 'manual' flow, the user copies the code from Google and pastes it.
-    """
+    """Generate a Google OAuth authorization URL."""
     redirect_uri = _build_redirect_uri()
     result = sheets_client.build_oauth_url(redirect_uri)
     if not result:
@@ -94,12 +90,17 @@ def oauth_start(current_user):
             'error': 'Google credentials not configured. Paste your credentials.json content in settings first.',
         }), 400
     auth_url, flow_type = result
+
+    # Persist the exact redirect_uri so /oauth/callback uses the same one
+    sr = SettingsRepository()
+    sr.set('_oauth_redirect_uri', redirect_uri, category='google')
+
     return jsonify({'success': True, 'auth_url': auth_url, 'flow_type': flow_type}), 200
 
 
 @sync_bp.route('/oauth/callback', methods=['GET'])
 def oauth_callback():
-    """Handle the OAuth redirect from Google (web clients only).
+    """Handle the OAuth redirect from Google.
 
     This is NOT behind auth — Google redirects the browser here directly.
     On success we redirect to the frontend settings page.
@@ -113,11 +114,16 @@ def oauth_callback():
     if not code:
         return redirect('/app-settings?oauth_error=no_code')
 
-    redirect_uri = _build_redirect_uri()
-    if sheets_client.exchange_code(code, redirect_uri):
+    # Reuse the EXACT redirect_uri from /oauth/start to avoid mismatch
+    sr = SettingsRepository()
+    redirect_uri = sr.get('_oauth_redirect_uri') or _build_redirect_uri()
+
+    success, error_msg = sheets_client.exchange_code(code, redirect_uri)
+    if success:
         return redirect('/app-settings?oauth_success=1')
     else:
-        return redirect('/app-settings?oauth_error=exchange_failed')
+        from urllib.parse import quote
+        return redirect(f'/app-settings?oauth_error={quote(error_msg or "exchange_failed")}')
 
 
 @sync_bp.route('/oauth/exchange', methods=['POST'])
@@ -133,8 +139,10 @@ def oauth_exchange(current_user):
     if not code:
         return jsonify({'success': False, 'error': 'No authorization code provided'}), 400
 
-    redirect_uri = _build_redirect_uri()
-    if sheets_client.exchange_code(code, redirect_uri):
+    sr = SettingsRepository()
+    redirect_uri = sr.get('_oauth_redirect_uri') or _build_redirect_uri()
+    success, error_msg = sheets_client.exchange_code(code, redirect_uri)
+    if success:
         return jsonify({'success': True, 'message': 'Google Sheets connected successfully'}), 200
     else:
         return jsonify({'success': False, 'error': 'Failed to exchange code — it may have expired. Try again.'}), 400
