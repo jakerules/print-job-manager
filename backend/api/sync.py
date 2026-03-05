@@ -44,6 +44,7 @@ def sync_status(current_user):
     """Return current sync status + Google connection state."""
     status = sync_service.get_status()
     status['google_connected'] = sheets_client.is_connected()
+    status['oauth_callback_url'] = _build_redirect_uri()
     return jsonify({'success': True, **status}), 200
 
 

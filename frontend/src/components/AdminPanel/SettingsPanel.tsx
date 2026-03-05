@@ -28,6 +28,7 @@ interface SyncStatus {
   last_sync_jobs_pushed: number
   sheets_configured: boolean
   google_connected: boolean
+  oauth_callback_url: string
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -90,9 +91,6 @@ export default function SettingsPanel() {
   // Sync state
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
   const [syncing, setSyncing] = useState(false)
-  const [oauthCode, setOauthCode] = useState('')
-  const [showCodeInput, setShowCodeInput] = useState(false)
-  const [exchanging, setExchanging] = useState(false)
 
   const loadSettings = async () => {
     setLoading(true)
@@ -185,42 +183,18 @@ export default function SettingsPanel() {
         await apiService.put('/settings', { settings: flat })
         setDirty(false)
       }
-      const res = await apiService.post<{ success: boolean; auth_url?: string; flow_type?: string; error?: string }>('/sync/oauth/start', {})
+      const res = await apiService.post<{ success: boolean; auth_url?: string; error?: string }>('/sync/oauth/start', {})
       if (res.success && res.auth_url) {
-        window.open(res.auth_url, '_blank')
-        if (res.flow_type === 'manual') {
-          // Desktop/installed client — user needs to copy-paste the code
-          setShowCodeInput(true)
-          setOauthCode('')
-        }
-        // For 'redirect' flow, the callback handles it automatically
+        // Opens Google consent screen; on approval, Google redirects back
+        // to /api/sync/oauth/callback which stores the token and redirects
+        // to /app-settings?oauth_success=1
+        window.location.href = res.auth_url
       } else {
         setSnackbar({ open: true, message: res.error || 'Failed to start OAuth', severity: 'error' })
       }
     } catch (err: any) {
       const msg = err?.response?.data?.error || 'Failed to start Google authorization'
       setSnackbar({ open: true, message: msg, severity: 'error' })
-    }
-  }
-
-  const handleSubmitCode = async () => {
-    if (!oauthCode.trim()) return
-    setExchanging(true)
-    try {
-      const res = await apiService.post<{ success: boolean; error?: string }>('/sync/oauth/exchange', { code: oauthCode.trim() })
-      if (res.success) {
-        setSnackbar({ open: true, message: 'Google Sheets connected successfully!', severity: 'success' })
-        setShowCodeInput(false)
-        setOauthCode('')
-        loadSyncStatus()
-      } else {
-        setSnackbar({ open: true, message: res.error || 'Failed to exchange code', severity: 'error' })
-      }
-    } catch (err: any) {
-      const msg = err?.response?.data?.error || 'Failed to exchange authorization code'
-      setSnackbar({ open: true, message: msg, severity: 'error' })
-    } finally {
-      setExchanging(false)
     }
   }
 
@@ -308,15 +282,22 @@ export default function SettingsPanel() {
         </Typography>
         <Divider sx={{ mb: 2 }} />
 
-        {/* Step 1: Credentials JSON */}
-        <Typography variant="body2" color="text.secondary" mb={1}>
-          Paste the contents of your Google Cloud OAuth <code>credentials.json</code> file below.
-          You can get this from the{' '}
+        {/* Setup instructions */}
+        <Alert severity="info" sx={{ mb: 2 }}>
+          <strong>Setup:</strong> In{' '}
           <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">
             Google Cloud Console
-          </a>{' '}
-          → OAuth 2.0 Client IDs → Download JSON.
-        </Typography>
+          </a>
+          , create an OAuth 2.0 Client ID (type: <strong>Web application</strong>). Add this as an authorized redirect URI:
+          <br />
+          <code style={{ userSelect: 'all', fontWeight: 'bold' }}>
+            {syncStatus?.oauth_callback_url || '(loading...)'}
+          </code>
+          <br />
+          Then download the JSON and paste it below.
+        </Alert>
+
+        {/* Credentials JSON */}
         <TextField
           label="credentials.json contents"
           value={settings.google?.google_credentials_json || ''}
@@ -326,11 +307,11 @@ export default function SettingsPanel() {
           multiline
           minRows={2}
           maxRows={6}
-          placeholder='{"installed":{"client_id":"...","client_secret":"..."}}'
+          placeholder='{"web":{"client_id":"...","client_secret":"...","redirect_uris":["..."]}}'
           sx={{ mb: 2, fontFamily: 'monospace' }}
         />
 
-        {/* Step 2: Connect / Disconnect */}
+        {/* Connect / Disconnect */}
         {syncStatus && (
           <Box display="flex" alignItems="center" gap={2} mb={2}>
             {syncStatus.google_connected ? (
@@ -353,45 +334,11 @@ export default function SettingsPanel() {
                 </Button>
                 {!settings.google?.google_credentials_json && (
                   <Typography variant="caption" color="text.secondary">
-                    Paste credentials above &amp; save, then connect
+                    Paste credentials above, then connect
                   </Typography>
                 )}
               </>
             )}
-          </Box>
-        )}
-
-        {/* Manual code entry (for Desktop/installed OAuth clients) */}
-        {showCodeInput && (
-          <Box sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-            <Typography variant="body2" mb={1}>
-              After authorizing in Google, it will display a code on screen. Copy the code and paste it below:
-            </Typography>
-            <Box display="flex" gap={1} alignItems="flex-start">
-              <TextField
-                label="Authorization code"
-                value={oauthCode}
-                onChange={(e) => setOauthCode(e.target.value)}
-                size="small"
-                fullWidth
-                placeholder="4/0AX4XfWh..."
-              />
-              <Button
-                variant="contained"
-                onClick={handleSubmitCode}
-                disabled={!oauthCode.trim() || exchanging}
-                sx={{ whiteSpace: 'nowrap' }}
-              >
-                {exchanging ? 'Connecting…' : 'Submit Code'}
-              </Button>
-              <Button
-                variant="text"
-                size="small"
-                onClick={() => setShowCodeInput(false)}
-              >
-                Cancel
-              </Button>
-            </Box>
           </Box>
         )}
 

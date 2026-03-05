@@ -114,63 +114,66 @@ def get_client_type() -> Optional[str]:
     return 'installed'
 
 
-# OOB redirect for "installed" (Desktop) OAuth clients — Google shows
-# the auth code directly on screen, no redirect needed.
-_OOB_REDIRECT = 'urn:ietf:wg:oauth:2.0:oob'
+def _coerce_to_web_config(client_config: dict, redirect_uri: str) -> dict:
+    """Convert an 'installed' client config to 'web' format.
+
+    Google OAuth client_id/client_secret work for both installed and web
+    flows — only the wrapper key and redirect_uris differ. By re-wrapping
+    as 'web' with our server callback, we can use the redirect flow even
+    with Desktop-type credentials.
+    """
+    if 'web' in client_config:
+        return client_config
+
+    installed = client_config.get('installed', {})
+    return {
+        'web': {
+            'client_id': installed['client_id'],
+            'client_secret': installed['client_secret'],
+            'auth_uri': installed.get('auth_uri', 'https://accounts.google.com/o/oauth2/auth'),
+            'token_uri': installed.get('token_uri', 'https://oauth2.googleapis.com/token'),
+            'redirect_uris': [redirect_uri],
+        }
+    }
 
 
 def build_oauth_url(redirect_uri: str) -> Optional[tuple]:
     """Generate the Google OAuth authorization URL.
 
-    For "web" clients: uses the provided redirect_uri (server callback).
-    For "installed" clients: uses loopback redirect so Google displays
-    the auth code for the user to copy-paste.
+    Always uses the server-side redirect flow. For 'installed' (Desktop)
+    credentials, we re-wrap them as 'web' type so the redirect to our
+    callback URL is allowed by Google.
 
     Returns (auth_url, flow_type) or None.
-      flow_type is 'redirect' (automatic) or 'manual' (user copies code).
     """
     client_config = _get_client_config()
     if not client_config:
         return None
 
-    if 'web' in client_config:
-        # Web client — use server-side redirect
-        flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=redirect_uri)
-        auth_url, _ = flow.authorization_url(
-            access_type='offline',
-            include_granted_scopes='true',
-            prompt='consent',
-        )
-        return auth_url, 'redirect'
-    else:
-        # Installed (Desktop) client — user will copy the code
-        flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=_OOB_REDIRECT)
-        auth_url, _ = flow.authorization_url(
-            access_type='offline',
-            include_granted_scopes='true',
-            prompt='consent',
-        )
-        return auth_url, 'manual'
+    # Always use web-style redirect flow
+    web_config = _coerce_to_web_config(client_config, redirect_uri)
+    flow = Flow.from_client_config(web_config, scopes=SCOPES, redirect_uri=redirect_uri)
+    auth_url, _ = flow.authorization_url(
+        access_type='offline',
+        include_granted_scopes='true',
+        prompt='consent',
+    )
+    return auth_url, 'redirect'
 
 
 def exchange_code(code: str, redirect_uri: str) -> bool:
     """Exchange an OAuth authorization code for tokens and store in DB.
 
-    Uses the same redirect_uri that was used to generate the auth URL.
     Returns True on success.
     """
     client_config = _get_client_config()
     if not client_config:
         return False
 
-    # Use the matching redirect_uri for the client type
-    if 'web' in client_config:
-        actual_redirect = redirect_uri
-    else:
-        actual_redirect = _OOB_REDIRECT
+    web_config = _coerce_to_web_config(client_config, redirect_uri)
 
     try:
-        flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=actual_redirect)
+        flow = Flow.from_client_config(web_config, scopes=SCOPES, redirect_uri=redirect_uri)
         flow.fetch_token(code=code)
         creds = flow.credentials
         # Store token JSON in DB
