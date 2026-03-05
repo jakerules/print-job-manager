@@ -158,6 +158,9 @@ def build_oauth_url(redirect_uri: str) -> Optional[tuple]:
         include_granted_scopes='true',
         prompt='consent',
     )
+    # Persist the PKCE code_verifier so exchange_code() can use it
+    sr = SettingsRepository()
+    sr.set('_oauth_code_verifier', flow.code_verifier or '', category='google')
     return auth_url, 'redirect'
 
 
@@ -174,6 +177,11 @@ def exchange_code(code: str, redirect_uri: str) -> tuple:
 
     try:
         flow = Flow.from_client_config(web_config, scopes=SCOPES, redirect_uri=redirect_uri)
+        # Restore the PKCE code_verifier from the authorization step
+        sr = SettingsRepository()
+        code_verifier = sr.get('_oauth_code_verifier')
+        if code_verifier:
+            flow.code_verifier = code_verifier
         flow.fetch_token(code=code)
         creds = flow.credentials
         # Store token JSON in DB
@@ -199,8 +207,6 @@ def disconnect():
     sr = SettingsRepository()
     sr.set('google_token_json', '', category='google')
     reset_service()
-
-    return creds
 
 
 def get_sheets_service():
