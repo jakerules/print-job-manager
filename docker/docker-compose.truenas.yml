@@ -4,6 +4,9 @@
 # 2. Place this file there and run:  docker compose up -d
 # 3. App will be at http://<truenas-ip>:9080
 #
+# To build from source instead of pulling GHCR images:
+#   docker compose build --no-cache && docker compose up -d
+#
 # Optional — Google Sheets integration:
 #   mkdir -p config && cp config.ini config/ && cp credentials.json .
 #   Then uncomment the two volume lines below and restart.
@@ -11,8 +14,11 @@
 services:
   backend:
     image: ghcr.io/jakerules/print-job-manager/backend:latest
+    build:
+      context: https://github.com/jakerules/print-job-manager.git#master
+      dockerfile: docker/Dockerfile.backend
     ports:
-      - "5080:5000"
+      - "${BACKEND_PORT:-5080}:5000"
     volumes:
       - ./database:/data/db
       - ./uploads:/app/uploads
@@ -21,7 +27,8 @@ services:
       # - ./credentials.json:/app/web_app/credentials.json:ro
     environment:
       - FLASK_ENV=production
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-CHANGE-ME-use-a-random-string-here}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-in-production}
+      - RESET_ADMIN_PASSWORD=${RESET_ADMIN_PASSWORD:-}
       - TZ=${TZ:-America/New_York}
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')"]
@@ -33,8 +40,12 @@ services:
 
   frontend:
     image: ghcr.io/jakerules/print-job-manager/frontend:latest
+    build:
+      context: https://github.com/jakerules/print-job-manager.git#master
+      dockerfile: docker/Dockerfile.frontend
     ports:
-      - "9080:80"
+      - "${FRONTEND_PORT:-9080}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped

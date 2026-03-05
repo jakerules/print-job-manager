@@ -12,13 +12,17 @@ services:
       context: https://github.com/jakerules/print-job-manager.git#master
       dockerfile: docker/Dockerfile.backend
     ports:
-      - "5080:5000"
+      - "${BACKEND_PORT:-5080}:5000"
     volumes:
       - ./database:/data/db
       - ./uploads:/app/uploads
+      # Uncomment BOTH lines below for Google Sheets integration:
+      # - ./config:/app/config:ro
+      # - ./credentials.json:/app/web_app/credentials.json:ro
     environment:
       - FLASK_ENV=production
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-CHANGE-ME-use-a-random-string-here}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-in-production}
+      - RESET_ADMIN_PASSWORD=${RESET_ADMIN_PASSWORD:-}
       - TZ=${TZ:-America/New_York}
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/api/health')"]
@@ -33,7 +37,8 @@ services:
       context: https://github.com/jakerules/print-job-manager.git#master
       dockerfile: docker/Dockerfile.frontend
     ports:
-      - "9080:80"
+      - "${FRONTEND_PORT:-9080}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
