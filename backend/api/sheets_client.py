@@ -104,40 +104,72 @@ def _get_client_config() -> Optional[dict]:
         return None
 
 
-def build_oauth_url(redirect_uri: str) -> Optional[str]:
-    """Generate the Google OAuth authorization URL for the web flow.
+def get_client_type() -> Optional[str]:
+    """Return 'installed' or 'web' based on stored credentials, or None."""
+    config = _get_client_config()
+    if not config:
+        return None
+    if 'web' in config:
+        return 'web'
+    return 'installed'
 
-    Args:
-        redirect_uri: The URL Google will redirect back to after auth
-                      (e.g. https://printjob1.jgrossman.me/api/sync/oauth/callback)
 
-    Returns:
-        The authorization URL string, or None if credentials.json isn't configured.
+# Loopback redirect for "installed" (Desktop) OAuth clients
+_LOOPBACK_REDIRECT = 'http://localhost'
+
+
+def build_oauth_url(redirect_uri: str) -> Optional[tuple]:
+    """Generate the Google OAuth authorization URL.
+
+    For "web" clients: uses the provided redirect_uri (server callback).
+    For "installed" clients: uses loopback redirect so Google displays
+    the auth code for the user to copy-paste.
+
+    Returns (auth_url, flow_type) or None.
+      flow_type is 'redirect' (automatic) or 'manual' (user copies code).
     """
     client_config = _get_client_config()
     if not client_config:
         return None
 
-    flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=redirect_uri)
-    auth_url, _ = flow.authorization_url(
-        access_type='offline',
-        include_granted_scopes='true',
-        prompt='consent',
-    )
-    return auth_url
+    if 'web' in client_config:
+        # Web client — use server-side redirect
+        flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=redirect_uri)
+        auth_url, _ = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true',
+            prompt='consent',
+        )
+        return auth_url, 'redirect'
+    else:
+        # Installed (Desktop) client — user will copy the code
+        flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=_LOOPBACK_REDIRECT)
+        auth_url, _ = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true',
+            prompt='consent',
+        )
+        return auth_url, 'manual'
 
 
 def exchange_code(code: str, redirect_uri: str) -> bool:
     """Exchange an OAuth authorization code for tokens and store in DB.
 
+    Uses the same redirect_uri that was used to generate the auth URL.
     Returns True on success.
     """
     client_config = _get_client_config()
     if not client_config:
         return False
 
+    # Use the matching redirect_uri for the client type
+    if 'web' in client_config:
+        actual_redirect = redirect_uri
+    else:
+        actual_redirect = _LOOPBACK_REDIRECT
+
     try:
-        flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=redirect_uri)
+        flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=actual_redirect)
         flow.fetch_token(code=code)
         creds = flow.credentials
         # Store token JSON in DB

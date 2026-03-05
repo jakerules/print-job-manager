@@ -82,21 +82,23 @@ def sync_toggle(current_user):
 def oauth_start(current_user):
     """Generate a Google OAuth authorization URL.
 
-    The frontend will open this URL in a new tab/popup.
+    Returns auth_url and flow_type ('redirect' or 'manual').
+    For 'manual' flow, the user copies the code from Google and pastes it.
     """
     redirect_uri = _build_redirect_uri()
-    url = sheets_client.build_oauth_url(redirect_uri)
-    if not url:
+    result = sheets_client.build_oauth_url(redirect_uri)
+    if not result:
         return jsonify({
             'success': False,
             'error': 'Google credentials not configured. Paste your credentials.json content in settings first.',
         }), 400
-    return jsonify({'success': True, 'auth_url': url}), 200
+    auth_url, flow_type = result
+    return jsonify({'success': True, 'auth_url': auth_url, 'flow_type': flow_type}), 200
 
 
 @sync_bp.route('/oauth/callback', methods=['GET'])
 def oauth_callback():
-    """Handle the OAuth redirect from Google.
+    """Handle the OAuth redirect from Google (web clients only).
 
     This is NOT behind auth — Google redirects the browser here directly.
     On success we redirect to the frontend settings page.
@@ -115,6 +117,26 @@ def oauth_callback():
         return redirect('/app-settings?oauth_success=1')
     else:
         return redirect('/app-settings?oauth_error=exchange_failed')
+
+
+@sync_bp.route('/oauth/exchange', methods=['POST'])
+@token_required
+@role_required('admin')
+def oauth_exchange(current_user):
+    """Manually exchange an authorization code (for Desktop/installed clients).
+
+    The user copies the code from Google's auth page and submits it here.
+    """
+    data = request.get_json() or {}
+    code = data.get('code', '').strip()
+    if not code:
+        return jsonify({'success': False, 'error': 'No authorization code provided'}), 400
+
+    redirect_uri = _build_redirect_uri()
+    if sheets_client.exchange_code(code, redirect_uri):
+        return jsonify({'success': True, 'message': 'Google Sheets connected successfully'}), 200
+    else:
+        return jsonify({'success': False, 'error': 'Failed to exchange code — it may have expired. Try again.'}), 400
 
 
 @sync_bp.route('/oauth/disconnect', methods=['POST'])

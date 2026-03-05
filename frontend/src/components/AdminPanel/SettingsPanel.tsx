@@ -90,6 +90,9 @@ export default function SettingsPanel() {
   // Sync state
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
   const [syncing, setSyncing] = useState(false)
+  const [oauthCode, setOauthCode] = useState('')
+  const [showCodeInput, setShowCodeInput] = useState(false)
+  const [exchanging, setExchanging] = useState(false)
 
   const loadSettings = async () => {
     setLoading(true)
@@ -182,15 +185,42 @@ export default function SettingsPanel() {
         await apiService.put('/settings', { settings: flat })
         setDirty(false)
       }
-      const res = await apiService.post<{ success: boolean; auth_url?: string; error?: string }>('/sync/oauth/start', {})
+      const res = await apiService.post<{ success: boolean; auth_url?: string; flow_type?: string; error?: string }>('/sync/oauth/start', {})
       if (res.success && res.auth_url) {
         window.open(res.auth_url, '_blank')
+        if (res.flow_type === 'manual') {
+          // Desktop/installed client — user needs to copy-paste the code
+          setShowCodeInput(true)
+          setOauthCode('')
+        }
+        // For 'redirect' flow, the callback handles it automatically
       } else {
         setSnackbar({ open: true, message: res.error || 'Failed to start OAuth', severity: 'error' })
       }
     } catch (err: any) {
       const msg = err?.response?.data?.error || 'Failed to start Google authorization'
       setSnackbar({ open: true, message: msg, severity: 'error' })
+    }
+  }
+
+  const handleSubmitCode = async () => {
+    if (!oauthCode.trim()) return
+    setExchanging(true)
+    try {
+      const res = await apiService.post<{ success: boolean; error?: string }>('/sync/oauth/exchange', { code: oauthCode.trim() })
+      if (res.success) {
+        setSnackbar({ open: true, message: 'Google Sheets connected successfully!', severity: 'success' })
+        setShowCodeInput(false)
+        setOauthCode('')
+        loadSyncStatus()
+      } else {
+        setSnackbar({ open: true, message: res.error || 'Failed to exchange code', severity: 'error' })
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || 'Failed to exchange authorization code'
+      setSnackbar({ open: true, message: msg, severity: 'error' })
+    } finally {
+      setExchanging(false)
     }
   }
 
@@ -328,6 +358,40 @@ export default function SettingsPanel() {
                 )}
               </>
             )}
+          </Box>
+        )}
+
+        {/* Manual code entry (for Desktop/installed OAuth clients) */}
+        {showCodeInput && (
+          <Box sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+            <Typography variant="body2" mb={1}>
+              After authorizing in Google, copy the code from the page and paste it below:
+            </Typography>
+            <Box display="flex" gap={1} alignItems="flex-start">
+              <TextField
+                label="Authorization code"
+                value={oauthCode}
+                onChange={(e) => setOauthCode(e.target.value)}
+                size="small"
+                fullWidth
+                placeholder="4/0AX4XfWh..."
+              />
+              <Button
+                variant="contained"
+                onClick={handleSubmitCode}
+                disabled={!oauthCode.trim() || exchanging}
+                sx={{ whiteSpace: 'nowrap' }}
+              >
+                {exchanging ? 'Connecting…' : 'Submit Code'}
+              </Button>
+              <Button
+                variant="text"
+                size="small"
+                onClick={() => setShowCodeInput(false)}
+              >
+                Cancel
+              </Button>
+            </Box>
           </Box>
         )}
 
