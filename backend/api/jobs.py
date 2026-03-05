@@ -19,7 +19,7 @@ try:
         SPREADSHEET_ID, SHEET_NAME, COLUMN_MAP
     )
     _sheets_available = True
-except Exception as e:
+except BaseException as e:
     print(f"⚠ Google Sheets integration unavailable: {e}")
     print("  Job endpoints will return demo data. Add config.ini + credentials.json to enable.")
 
