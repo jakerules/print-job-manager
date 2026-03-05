@@ -171,14 +171,26 @@ export default function SettingsPanel() {
 
   const handleConnectGoogle = async () => {
     try {
+      // Auto-save settings first so credentials.json is persisted to DB
+      if (dirty) {
+        const flat: Record<string, string> = {}
+        for (const cat of Object.values(settings)) {
+          for (const [k, v] of Object.entries(cat)) {
+            flat[k] = v
+          }
+        }
+        await apiService.put('/settings', { settings: flat })
+        setDirty(false)
+      }
       const res = await apiService.post<{ success: boolean; auth_url?: string; error?: string }>('/sync/oauth/start', {})
       if (res.success && res.auth_url) {
         window.open(res.auth_url, '_blank')
       } else {
         setSnackbar({ open: true, message: res.error || 'Failed to start OAuth', severity: 'error' })
       }
-    } catch {
-      setSnackbar({ open: true, message: 'Failed to start Google authorization', severity: 'error' })
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || 'Failed to start Google authorization'
+      setSnackbar({ open: true, message: msg, severity: 'error' })
     }
   }
 
