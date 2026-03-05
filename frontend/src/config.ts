@@ -1,6 +1,8 @@
 // API Configuration
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
-export const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost:5000'
+// In production (Docker/nginx) use relative URLs so requests go through the reverse proxy.
+// In development, .env.development overrides these with http://localhost:5000.
+export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
+export const WS_URL = import.meta.env.VITE_WS_URL || ''
 
 // Features
 export const FEATURES = {

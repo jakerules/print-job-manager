@@ -45,6 +45,14 @@ class User:
     @classmethod
     def from_db_row(cls, row):
         """Create User instance from database row."""
+        try:
+            created_at = datetime.fromisoformat(row['created_at']) if row['created_at'] else None
+        except (ValueError, TypeError):
+            created_at = None
+        try:
+            last_login = datetime.fromisoformat(row['last_login']) if row['last_login'] else None
+        except (ValueError, TypeError):
+            last_login = None
         return cls(
             id=row['id'],
             username=row['username'],
@@ -52,8 +60,8 @@ class User:
             password_hash=row['password_hash'],
             role=row['role'],
             is_active=bool(row['is_active']),
-            created_at=datetime.fromisoformat(row['created_at']) if row['created_at'] else None,
-            last_login=datetime.fromisoformat(row['last_login']) if row['last_login'] else None
+            created_at=created_at,
+            last_login=last_login
         )
 
 
