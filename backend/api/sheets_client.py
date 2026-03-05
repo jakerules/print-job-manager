@@ -114,8 +114,9 @@ def get_client_type() -> Optional[str]:
     return 'installed'
 
 
-# Loopback redirect for "installed" (Desktop) OAuth clients
-_LOOPBACK_REDIRECT = 'http://localhost'
+# OOB redirect for "installed" (Desktop) OAuth clients — Google shows
+# the auth code directly on screen, no redirect needed.
+_OOB_REDIRECT = 'urn:ietf:wg:oauth:2.0:oob'
 
 
 def build_oauth_url(redirect_uri: str) -> Optional[tuple]:
@@ -143,7 +144,7 @@ def build_oauth_url(redirect_uri: str) -> Optional[tuple]:
         return auth_url, 'redirect'
     else:
         # Installed (Desktop) client — user will copy the code
-        flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=_LOOPBACK_REDIRECT)
+        flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=_OOB_REDIRECT)
         auth_url, _ = flow.authorization_url(
             access_type='offline',
             include_granted_scopes='true',
@@ -166,7 +167,7 @@ def exchange_code(code: str, redirect_uri: str) -> bool:
     if 'web' in client_config:
         actual_redirect = redirect_uri
     else:
-        actual_redirect = _LOOPBACK_REDIRECT
+        actual_redirect = _OOB_REDIRECT
 
     try:
         flow = Flow.from_client_config(client_config, scopes=SCOPES, redirect_uri=actual_redirect)

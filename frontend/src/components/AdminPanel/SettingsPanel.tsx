@@ -365,7 +365,7 @@ export default function SettingsPanel() {
         {showCodeInput && (
           <Box sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
             <Typography variant="body2" mb={1}>
-              After authorizing in Google, copy the code from the page and paste it below:
+              After authorizing in Google, it will display a code on screen. Copy the code and paste it below:
             </Typography>
             <Box display="flex" gap={1} alignItems="flex-start">
               <TextField
