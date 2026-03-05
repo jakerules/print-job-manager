@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   Box,
   Typography,
@@ -11,12 +11,22 @@ import {
   Snackbar,
   Divider,
   CircularProgress,
+  Chip,
 } from '@mui/material'
-import { Save } from '@mui/icons-material'
+import { Save, Sync, SyncDisabled } from '@mui/icons-material'
 import { apiService } from '../../services/api'
 
 interface SettingsMap {
   [category: string]: { [key: string]: string }
+}
+
+interface SyncStatus {
+  enabled: boolean
+  last_sync_time: string | null
+  last_sync_error: string | null
+  last_sync_jobs_pulled: number
+  last_sync_jobs_pushed: number
+  sheets_configured: boolean
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -70,6 +80,10 @@ export default function SettingsPanel() {
   const [dirty, setDirty] = useState(false)
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' })
 
+  // Sync state
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
+  const [syncing, setSyncing] = useState(false)
+
   const loadSettings = async () => {
     setLoading(true)
     try {
@@ -83,7 +97,16 @@ export default function SettingsPanel() {
     }
   }
 
-  useEffect(() => { loadSettings() }, [])
+  const loadSyncStatus = useCallback(async () => {
+    try {
+      const res = await apiService.get<SyncStatus & { success: boolean }>('/sync/status')
+      setSyncStatus(res)
+    } catch {
+      // Sync endpoint may not exist on older backends
+    }
+  }, [])
+
+  useEffect(() => { loadSettings(); loadSyncStatus() }, [loadSyncStatus])
 
   const handleChange = (category: string, key: string, value: string) => {
     setSettings((prev) => ({
@@ -109,6 +132,33 @@ export default function SettingsPanel() {
       setSnackbar({ open: true, message: 'Failed to save settings', severity: 'error' })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleSyncNow = async () => {
+    setSyncing(true)
+    try {
+      const res = await apiService.post<{ success: boolean; pulled: number; pushed: number; error?: string }>('/sync/trigger', {})
+      if (res.success) {
+        setSnackbar({ open: true, message: `Sync complete: ${res.pulled} pulled, ${res.pushed} pushed`, severity: 'success' })
+      } else {
+        setSnackbar({ open: true, message: `Sync partially failed: ${res.error}`, severity: 'error' })
+      }
+      loadSyncStatus()
+    } catch {
+      setSnackbar({ open: true, message: 'Sync failed', severity: 'error' })
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const handleToggleSync = async (enabled: boolean) => {
+    try {
+      await apiService.put('/sync/toggle', { enabled })
+      loadSyncStatus()
+      setSnackbar({ open: true, message: `Background sync ${enabled ? 'enabled' : 'disabled'}`, severity: 'success' })
+    } catch {
+      setSnackbar({ open: true, message: 'Failed to toggle sync', severity: 'error' })
     }
   }
 
@@ -164,6 +214,64 @@ export default function SettingsPanel() {
       {categories.length === 0 && (
         <Alert severity="info">No settings found. Settings will appear after the backend initializes.</Alert>
       )}
+
+      {/* Google Sheets Sync Section */}
+      <Paper sx={{ p: 3, mb: 2 }}>
+        <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+          Google Sheets Sync
+        </Typography>
+        <Divider sx={{ mb: 2 }} />
+        {syncStatus ? (
+          <Box display="flex" flexDirection="column" gap={2}>
+            <Box display="flex" alignItems="center" gap={2}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={syncStatus.enabled}
+                    onChange={(e) => handleToggleSync(e.target.checked)}
+                  />
+                }
+                label="Enable Background Sync"
+              />
+              <Chip
+                label={syncStatus.enabled ? 'Active' : 'Disabled'}
+                color={syncStatus.enabled ? 'success' : 'default'}
+                size="small"
+              />
+            </Box>
+            {!syncStatus.sheets_configured && (
+              <Alert severity="warning" sx={{ mb: 1 }}>
+                Set the <strong>Spreadsheet ID</strong> in the Google Sheets settings above to enable sync.
+              </Alert>
+            )}
+            {syncStatus.last_sync_time && (
+              <Typography variant="body2" color="text.secondary">
+                Last sync: {new Date(syncStatus.last_sync_time).toLocaleString()}
+                {' — '}
+                {syncStatus.last_sync_jobs_pulled} pulled, {syncStatus.last_sync_jobs_pushed} pushed
+              </Typography>
+            )}
+            {syncStatus.last_sync_error && (
+              <Alert severity="error" sx={{ mb: 1 }}>{syncStatus.last_sync_error}</Alert>
+            )}
+            <Box>
+              <Button
+                variant="outlined"
+                startIcon={syncing ? <CircularProgress size={18} /> : <Sync />}
+                onClick={handleSyncNow}
+                disabled={syncing || !syncStatus.sheets_configured}
+              >
+                {syncing ? 'Syncing…' : 'Sync Now'}
+              </Button>
+            </Box>
+          </Box>
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            <SyncDisabled fontSize="small" sx={{ verticalAlign: 'middle', mr: 0.5 }} />
+            Sync status unavailable
+          </Typography>
+        )}
+      </Paper>
 
       <Snackbar
         open={snackbar.open}

@@ -17,6 +17,7 @@ from api.notifications import notifications_bp
 from api.audit import audit_bp
 from api.health import health_bp
 from api.settings import settings_bp
+from api.sync import sync_bp
 
 # Import WebSocket
 from api.websocket import socketio
@@ -50,6 +51,16 @@ app.register_blueprint(notifications_bp)
 app.register_blueprint(audit_bp)
 app.register_blueprint(health_bp)
 app.register_blueprint(settings_bp)
+app.register_blueprint(sync_bp)
+
+# Start background Sheets sync if credentials are available
+try:
+    from api import sync_service
+    from api.settings_repository import SettingsRepository
+    if SettingsRepository().get('spreadsheet_id'):
+        sync_service.start_background_sync()
+except Exception as e:
+    print(f"⚠️  Background sync not started: {e}")
 
 
 @app.route('/')
