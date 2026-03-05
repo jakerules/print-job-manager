@@ -13,7 +13,7 @@ import {
   CircularProgress,
 } from '@mui/material'
 import { Save } from '@mui/icons-material'
-import api from '../../services/api'
+import { apiService } from '../../services/api'
 
 interface SettingsMap {
   [category: string]: { [key: string]: string }
@@ -73,8 +73,8 @@ export default function SettingsPanel() {
   const loadSettings = async () => {
     setLoading(true)
     try {
-      const res = await api.get('/api/settings')
-      setSettings(res.data.settings || {})
+      const res = await apiService.get<{ success: boolean; settings: SettingsMap }>('/settings')
+      setSettings(res.settings || {})
       setDirty(false)
     } catch {
       setSnackbar({ open: true, message: 'Failed to load settings', severity: 'error' })
@@ -102,7 +102,7 @@ export default function SettingsPanel() {
           flat[k] = v
         }
       }
-      await api.put('/api/settings', { settings: flat })
+      await apiService.put('/settings', { settings: flat })
       setSnackbar({ open: true, message: 'Settings saved', severity: 'success' })
       setDirty(false)
     } catch {
