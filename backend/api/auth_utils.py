@@ -2,12 +2,13 @@
 JWT authentication utilities.
 """
 import jwt
+import os
 import secrets
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any
 
-# Secret key for JWT (should be in environment variable in production)
-SECRET_KEY = secrets.token_urlsafe(32)
+# Secret key for JWT — use environment variable so tokens survive restarts
+SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or secrets.token_urlsafe(32)
 ALGORITHM = 'HS256'
 ACCESS_TOKEN_EXPIRE_MINUTES = 60  # 1 hour
 REFRESH_TOKEN_EXPIRE_DAYS = 30

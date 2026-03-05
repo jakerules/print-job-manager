@@ -29,8 +29,11 @@ class ApiService {
     this.client.interceptors.response.use(
       (response) => response,
       async (error) => {
-        if (error.response?.status === 401) {
-          // Token expired, try to refresh
+        const requestUrl = error.config?.url || ''
+        const isAuthRequest = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/refresh')
+
+        if (error.response?.status === 401 && !isAuthRequest) {
+          // Token expired, try to refresh (skip for login/refresh requests)
           const refreshToken = localStorage.getItem('refresh_token')
           if (refreshToken) {
             try {
