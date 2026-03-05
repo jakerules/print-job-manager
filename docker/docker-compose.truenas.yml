@@ -1,7 +1,7 @@
 # TrueNAS SCALE docker-compose
 # =============================
-# 1. Create a dataset for app data, e.g.: /mnt/pool/apps/print-job-manager
-# 2. Place this file there and run:  docker compose up -d
+# 1. Place this file in /mnt/HDDs/Applications/print-job-manager/
+# 2. Run:  docker compose up -d
 # 3. App will be at http://<truenas-ip>:9080
 #
 # To build from source instead of pulling GHCR images:
