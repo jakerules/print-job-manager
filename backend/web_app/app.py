@@ -41,7 +41,7 @@ config = configparser.ConfigParser()
 config_path = os.path.join(PROJECT_ROOT, 'config', 'config.ini')
 if not os.path.exists(config_path):
     logger.error("config.ini not found")
-    sys.exit(1)
+    raise RuntimeError("config.ini not found — Google Sheets integration disabled")
 config.read(config_path)
 
 # Google Sheets configuration
