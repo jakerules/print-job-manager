@@ -13,6 +13,11 @@ build/
 
 # Project specific files
 
+# Frontend build artifacts and dependencies
+frontend/node_modules/
+frontend/dist/
+frontend/package-lock.json
+
 
 # Runtime directories
 downloads/
