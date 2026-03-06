@@ -159,25 +159,20 @@ def push_to_sheets() -> int:
     conn.close()
 
     pushed = 0
+    cell_updates = []  # collect all updates for a single batch call
 
     for job_row in local_jobs:
         job = dict(job_row)
         job_id = job['job_id']
 
         if job_id in sheet_job_ids:
-            # Job exists in Sheet — update status & notes in Sheet
+            # Job exists in Sheet — queue status & notes updates
             row_idx = sheet_job_ids[job_id]
-
-            # Update staff notes
-            sheets_client.update_cell(row_idx, sheets_client.STAFF_NOTES_COL, job.get('staff_notes', ''))
-
-            # Update acknowledged / completed checkboxes
-            sheets_client.update_status_checkbox(
-                row_idx, sheets_client.ACKNOWLEDGED_COL, bool(job.get('acknowledged'))
-            )
-            sheets_client.update_status_checkbox(
-                row_idx, sheets_client.COMPLETED_COL, bool(job.get('completed'))
-            )
+            cell_updates.append((row_idx, sheets_client.STAFF_NOTES_COL, job.get('staff_notes', '')))
+            cell_updates.append((row_idx, sheets_client.ACKNOWLEDGED_COL,
+                                 'TRUE' if job.get('acknowledged') else 'FALSE'))
+            cell_updates.append((row_idx, sheets_client.COMPLETED_COL,
+                                 'TRUE' if job.get('completed') else 'FALSE'))
             pushed += 1
         else:
             # Job is local-only — append to Sheet
@@ -193,6 +188,11 @@ def push_to_sheets() -> int:
             })
             if sheets_client.append_row(sheet_row):
                 pushed += 1
+
+    # Send all cell updates in a single batch API call
+    if cell_updates:
+        if not sheets_client.batch_update_cells(cell_updates):
+            logger.warning("Batch update of existing Sheet rows failed")
 
     return pushed
 

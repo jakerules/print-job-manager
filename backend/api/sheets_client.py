@@ -291,6 +291,40 @@ def append_row(row: list) -> bool:
         return False
 
 
+def batch_update_cells(updates: list) -> bool:
+    """Batch update multiple cells in a single API call.
+
+    updates: list of (row_index, col_index, value) tuples (0-based indices).
+    Uses values().batchUpdate to stay within quota limits.
+    """
+    svc = get_sheets_service()
+    if not svc:
+        return False
+
+    sid, sname = _get_sheet_config()
+    if not sid:
+        return False
+
+    data = []
+    for row_index, col_index, value in updates:
+        col_letter = chr(ord('A') + col_index)
+        range_name = f"{sname}!{col_letter}{row_index + 1}"
+        data.append({'range': range_name, 'values': [[value]]})
+
+    if not data:
+        return True
+
+    try:
+        svc.spreadsheets().values().batchUpdate(
+            spreadsheetId=sid,
+            body={'valueInputOption': 'USER_ENTERED', 'data': data},
+        ).execute()
+        return True
+    except Exception as e:
+        logger.error(f"Failed to batch update cells: {e}")
+        return False
+
+
 def update_cell(row_index: int, col_index: int, value) -> bool:
     """Update a single cell by 0-based row and column index."""
     svc = get_sheets_service()
