@@ -175,10 +175,12 @@ def push_to_sheets() -> int:
         job_id = job['job_id']
 
         if job_id in sheet_job_ids:
-            # Job exists in Sheet — only update staff notes (B)
-            # Columns M/N (acknowledged/completed) are protected in the Sheet
+            # Job exists in Sheet — push status updates to M/N
             row_idx = sheet_job_ids[job_id]
-            cell_updates.append((row_idx, sheets_client.STAFF_NOTES_COL, job.get('staff_notes', '')))
+            cell_updates.append((row_idx, sheets_client.ACKNOWLEDGED_COL,
+                                 'TRUE' if job.get('acknowledged') else 'FALSE'))
+            cell_updates.append((row_idx, sheets_client.COMPLETED_COL,
+                                 'TRUE' if job.get('completed') else 'FALSE'))
             pushed += 1
         else:
             # Job is local-only — append to Sheet
