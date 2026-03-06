@@ -370,6 +370,14 @@ def read_all_rows() -> Optional[List[list]]:
 
 def append_row(row: list) -> bool:
     """Append a single row to the sheet."""
+    return append_rows([row])
+
+
+def append_rows(rows: list) -> bool:
+    """Append multiple rows to the sheet in a single API call."""
+    if not rows:
+        return True
+
     svc = get_sheets_service()
     if not svc:
         return False
@@ -384,11 +392,11 @@ def append_row(row: list) -> bool:
             range=f"{sname}!A:O",
             valueInputOption='USER_ENTERED',
             insertDataOption='INSERT_ROWS',
-            body={'values': [row]},
+            body={'values': rows},
         ).execute()
         return True
     except Exception as e:
-        logger.error(f"Failed to append row: {e}")
+        logger.error(f"Failed to append rows: {e}")
         return False
 
 

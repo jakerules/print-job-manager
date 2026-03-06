@@ -122,8 +122,9 @@ def pull_from_sheets() -> int:
                 cursor.execute('''
                     INSERT INTO jobs (job_id, email, room, quantity, paper_size,
                         two_sided, stapled, hole_punch, file_url, deadline, notes, staff_notes,
-                        acknowledged, completed, completed_at, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        acknowledged, completed, completed_at, created_at, updated_at,
+                        sheets_row_pushed)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
                 ''', (
                     job_id,
                     job['email'],
@@ -187,6 +188,8 @@ def push_to_sheets() -> int:
         pushed = 0
         cell_updates = []  # collect all updates for a single batch call
         dirty_job_ids = []  # track which jobs to reset
+        new_rows = []       # collect rows to append in a single API call
+        new_job_ids = []    # track which jobs were appended
 
         for job_row in local_jobs:
             job = dict(job_row)
@@ -202,8 +205,8 @@ def push_to_sheets() -> int:
                                          'TRUE' if job.get('completed') else 'FALSE'))
                     dirty_job_ids.append(job_id)
                     pushed += 1
-            else:
-                # Job is local-only — append full row to Sheet
+            elif not job.get('sheets_row_pushed'):
+                # Job is local-only and not yet pushed — collect for batch append
                 sheet_row = sheets_client.job_dict_to_row({
                     'date_submitted': job.get('created_at', ''),
                     'staff_notes': job.get('staff_notes', ''),
@@ -221,13 +224,26 @@ def push_to_sheets() -> int:
                     'completed': bool(job.get('completed')),
                     'job_id': job_id,
                 })
-                if sheets_client.append_row(sheet_row):
-                    pushed += 1
+                new_rows.append(sheet_row)
+                new_job_ids.append(job_id)
 
         # Send all cell updates in a single batch API call
         if cell_updates:
             if not sheets_client.batch_update_cells(cell_updates):
                 logger.warning("Batch update of existing Sheet rows failed")
+
+        # Append all new rows in a single API call
+        if new_rows:
+            if sheets_client.append_rows(new_rows):
+                pushed += len(new_rows)
+                # Mark these jobs so we don't re-append them next cycle
+                placeholders = ','.join('?' * len(new_job_ids))
+                cursor.execute(
+                    f"UPDATE jobs SET sheets_row_pushed = 1 WHERE job_id IN ({placeholders})",
+                    new_job_ids,
+                )
+            else:
+                logger.warning(f"Failed to append {len(new_rows)} new rows to Sheet")
 
         # Reset dirty flag for pushed jobs
         if dirty_job_ids:
@@ -236,7 +252,8 @@ def push_to_sheets() -> int:
                 f"UPDATE jobs SET sheets_status_dirty = 0 WHERE job_id IN ({placeholders})",
                 dirty_job_ids,
             )
-            conn.commit()
+
+        conn.commit()
     finally:
         conn.close()
 

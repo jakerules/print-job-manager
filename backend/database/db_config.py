@@ -177,6 +177,9 @@ def init_db():
     if 'sheets_status_dirty' not in job_columns:
         cursor.execute("ALTER TABLE jobs ADD COLUMN sheets_status_dirty BOOLEAN DEFAULT 0")
         conn.commit()
+    if 'sheets_row_pushed' not in job_columns:
+        cursor.execute("ALTER TABLE jobs ADD COLUMN sheets_row_pushed BOOLEAN DEFAULT 0")
+        conn.commit()
 
     conn.close()
     print(f"Database initialized at {DB_PATH}")
