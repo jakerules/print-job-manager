@@ -6,6 +6,7 @@ from the settings DB table — no filesystem files needed.
 
 Supports a web-based OAuth flow so admins can authorize from the browser.
 """
+import io
 import json
 import logging
 from typing import Optional, List, Tuple
@@ -14,12 +15,16 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
 from api.settings_repository import SettingsRepository
 
 logger = logging.getLogger(__name__)
 
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive.file",
+]
 
 # Column layout matching the Google Form / Sheet structure
 TIMESTAMP_COL = 0       # A
@@ -51,6 +56,7 @@ DEFAULT_COLUMN_MAP = {
 }
 
 _sheets_service = None
+_drive_service = None
 
 
 # ── Credentials from DB ─────────────────────────────────────────────
@@ -229,8 +235,103 @@ def get_sheets_service():
 
 def reset_service():
     """Force re-auth on next call (e.g. after credential changes)."""
-    global _sheets_service
+    global _sheets_service, _drive_service
     _sheets_service = None
+    _drive_service = None
+
+
+def get_drive_service():
+    """Get or create the Google Drive API service (cached)."""
+    global _drive_service
+    if _drive_service:
+        return _drive_service
+
+    creds = _get_credentials()
+    if not creds:
+        return None
+
+    try:
+        _drive_service = build('drive', 'v3', credentials=creds)
+        return _drive_service
+    except Exception as e:
+        logger.error(f"Failed to build Drive service: {e}")
+        return None
+
+
+def extract_file_id_from_link(link: str) -> Optional[str]:
+    """Extract Google Drive file ID from a Drive URL."""
+    if not link:
+        return None
+    # Only extract from actual Google Drive URLs
+    if 'drive.google.com' not in link and 'docs.google.com' not in link:
+        return None
+    if 'open?id=' in link:
+        return link.split('open?id=')[1].split('&')[0]
+    elif 'file/d/' in link:
+        return link.split('file/d/')[1].split('/')[0]
+    elif 'id=' in link:
+        import re
+        m = re.search(r'[?&]id=([a-zA-Z0-9_-]+)', link)
+        return m.group(1) if m else None
+    return None
+
+
+def download_file_from_drive(file_id: str) -> Optional[tuple]:
+    """Download a file from Google Drive by file ID.
+
+    Returns (bytes_io, filename, mime_type) or None on failure.
+    """
+    svc = get_drive_service()
+    if not svc:
+        return None
+
+    try:
+        meta = svc.files().get(fileId=file_id, fields='name,mimeType').execute()
+        filename = meta.get('name', f'{file_id}.pdf')
+        mime_type = meta.get('mimeType', 'application/pdf')
+
+        request = svc.files().get_media(fileId=file_id)
+        buf = io.BytesIO()
+        downloader = MediaIoBaseDownload(buf, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+
+        buf.seek(0)
+        return buf, filename, mime_type
+    except Exception as e:
+        logger.error(f"Failed to download file {file_id} from Drive: {e}")
+        return None
+
+
+def upload_file_to_drive(file_stream, filename: str, mime_type: str = 'application/pdf',
+                         folder_id: Optional[str] = None) -> Optional[str]:
+    """Upload a file to Google Drive.
+
+    Returns the Google Drive link, or None on failure.
+    """
+    svc = get_drive_service()
+    if not svc:
+        return None
+
+    try:
+        file_metadata = {'name': filename}
+        if folder_id:
+            file_metadata['parents'] = [folder_id]
+
+        media = MediaIoBaseUpload(file_stream, mimetype=mime_type, resumable=True)
+        created = svc.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id,webViewLink',
+        ).execute()
+
+        file_id = created.get('id')
+        link = created.get('webViewLink', f'https://drive.google.com/file/d/{file_id}/view')
+        return link
+    except Exception as e:
+        logger.error(f"Failed to upload file to Drive: {e}")
+        return None
 
 
 def _get_sheet_config() -> Tuple[Optional[str], Optional[str]]:

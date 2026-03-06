@@ -115,6 +115,7 @@ class JobRepository:
             conn.close()
             return self.get_by_id(job_id)
 
+        sets.append("sheets_status_dirty = 1")
         sets.append("updated_at = ?")
         params.append(datetime.now(timezone.utc).isoformat())
         params.append(job_id)
@@ -195,6 +196,25 @@ class JobRepository:
 
     # ------------------------------------------------------------------
     @staticmethod
+    def _normalize_date(date_str: str) -> str:
+        """Try to normalize a date string to ISO format."""
+        if not date_str:
+            return ''
+        from datetime import datetime
+        # Already ISO format
+        if 'T' in date_str:
+            return date_str
+        # Try common formats from Google Sheets / Forms
+        for fmt in ('%m/%d/%Y %H:%M:%S', '%m/%d/%Y %I:%M:%S %p',
+                    '%Y-%m-%d %H:%M:%S', '%d/%m/%Y %H:%M:%S',
+                    '%m/%d/%Y', '%Y-%m-%d'):
+            try:
+                return datetime.strptime(date_str, fmt).isoformat()
+            except ValueError:
+                continue
+        return date_str  # return as-is if unparseable
+
+    @staticmethod
     def _row_to_dict(row) -> dict:
         """Convert a sqlite3.Row to the API-compatible dict."""
         return {
@@ -207,7 +227,7 @@ class JobRepository:
             'color': 'Yes' if row['color'] else 'No',
             'stapled': 'Yes' if row['stapled'] else 'No',
             'hole_punch': 'Yes' if row['hole_punch'] else 'No',
-            'date_submitted': row['created_at'] or '',
+            'date_submitted': JobRepository._normalize_date(row['created_at'] or ''),
             'job_deadline': row['deadline'] or '',
             'staff_notes': row['staff_notes'] or '',
             'user_notes': row['notes'] or '',

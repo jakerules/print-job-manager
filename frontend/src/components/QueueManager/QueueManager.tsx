@@ -347,48 +347,34 @@ export default function QueueManager() {
                 </Box>
               </Box>
 
-              {/* PDF Preview from Drive Link */}
-              {detailJob.file_url && getDriveFileId(detailJob.file_url) && (
+              {/* PDF Preview via backend proxy */}
+              {detailJob.file_url && (
                 <Box mt={2}>
                   <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                     <Typography variant="subtitle2" display="flex" alignItems="center" gap={0.5}>
                       <PictureAsPdf fontSize="small" /> File Preview
                     </Typography>
-                    <Button
-                      size="small"
-                      startIcon={<OpenInNew />}
-                      href={detailJob.file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Open in Drive
-                    </Button>
+                    {getDriveFileId(detailJob.file_url) && (
+                      <Button
+                        size="small"
+                        startIcon={<OpenInNew />}
+                        href={detailJob.file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Open in Drive
+                      </Button>
+                    )}
                   </Box>
                   <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
                     <iframe
-                      src={`https://drive.google.com/file/d/${getDriveFileId(detailJob.file_url)}/preview`}
+                      src={`${import.meta.env.VITE_API_URL || '/api'}/jobs/${detailJob.job_id}/file?token=${localStorage.getItem('access_token') || ''}`}
                       width="100%"
                       height="400"
                       style={{ border: 'none' }}
-                      allow="autoplay"
                       title="File Preview"
                     />
                   </Paper>
-                </Box>
-              )}
-
-              {/* Drive link without preview */}
-              {detailJob.file_url && !getDriveFileId(detailJob.file_url) && (
-                <Box mt={2}>
-                  <Button
-                    size="small"
-                    startIcon={<OpenInNew />}
-                    href={detailJob.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Open File
-                  </Button>
                 </Box>
               )}
 

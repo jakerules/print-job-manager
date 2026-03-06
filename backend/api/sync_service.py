@@ -51,6 +51,22 @@ def _update_status(error: Optional[str] = None, pulled: int = 0, pushed: int = 0
         _last_sync_jobs_pushed = pushed
 
 
+def _normalize_date(date_str: str) -> str:
+    """Normalize a date string to ISO format for consistent storage."""
+    if not date_str:
+        return ''
+    if 'T' in date_str:
+        return date_str
+    for fmt in ('%m/%d/%Y %H:%M:%S', '%m/%d/%Y %I:%M:%S %p',
+                '%Y-%m-%d %H:%M:%S', '%d/%m/%Y %H:%M:%S',
+                '%m/%d/%Y', '%Y-%m-%d'):
+        try:
+            return datetime.strptime(date_str, fmt).isoformat()
+        except ValueError:
+            continue
+    return date_str
+
+
 # ── Pull: Sheets → Local DB ─────────────────────────────────────────
 
 def pull_from_sheets() -> int:
@@ -124,7 +140,7 @@ def pull_from_sheets() -> int:
                     job['acknowledged'],
                     job['completed'],
                     job.get('completed_at') or None,
-                    job.get('date_submitted') or datetime.now(timezone.utc).isoformat(),
+                    _normalize_date(job.get('date_submitted', '')) or datetime.now(timezone.utc).isoformat(),
                     datetime.now(timezone.utc).isoformat(),
                 ))
             upserted += 1
@@ -142,10 +158,11 @@ def pull_from_sheets() -> int:
 # ── Push: Local DB → Sheets ─────────────────────────────────────────
 
 def push_to_sheets() -> int:
-    """Push local jobs that aren't yet in the Google Sheet.
+    """Push local job changes to the Google Sheet.
 
-    Reads all Sheet job_ids, then appends any local jobs missing from the Sheet.
-    Also updates Sheet status/notes for jobs that exist in both.
+    - For jobs that exist in the Sheet AND have sheets_status_dirty=1:
+      update only columns M (acknowledged) and N (completed), then reset the flag.
+    - For jobs that are local-only (not in Sheet): append a full row.
 
     Returns the number of jobs pushed/updated, or -1 on error.
     """
@@ -162,45 +179,66 @@ def push_to_sheets() -> int:
                 sheet_job_ids[jid] = idx
 
     conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute('SELECT * FROM jobs')
-    local_jobs = cursor.fetchall()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM jobs')
+        local_jobs = cursor.fetchall()
 
-    pushed = 0
-    cell_updates = []  # collect all updates for a single batch call
+        pushed = 0
+        cell_updates = []  # collect all updates for a single batch call
+        dirty_job_ids = []  # track which jobs to reset
 
-    for job_row in local_jobs:
-        job = dict(job_row)
-        job_id = job['job_id']
+        for job_row in local_jobs:
+            job = dict(job_row)
+            job_id = job['job_id']
 
-        if job_id in sheet_job_ids:
-            # Job exists in Sheet — push status updates to M/N
-            row_idx = sheet_job_ids[job_id]
-            cell_updates.append((row_idx, sheets_client.ACKNOWLEDGED_COL,
-                                 'TRUE' if job.get('acknowledged') else 'FALSE'))
-            cell_updates.append((row_idx, sheets_client.COMPLETED_COL,
-                                 'TRUE' if job.get('completed') else 'FALSE'))
-            pushed += 1
-        else:
-            # Job is local-only — append to Sheet
-            sheet_row = sheets_client.job_dict_to_row({
-                'date_submitted': job.get('created_at', ''),
-                'staff_notes': job.get('staff_notes', ''),
-                'email': job.get('email', ''),
-                'room': job.get('room', ''),
-                'user_notes': job.get('notes', ''),
-                'acknowledged': bool(job.get('acknowledged')),
-                'completed': bool(job.get('completed')),
-                'job_id': job_id,
-            })
-            if sheets_client.append_row(sheet_row):
-                pushed += 1
+            if job_id in sheet_job_ids:
+                # Only push M/N if the status was changed via the web UI
+                if job.get('sheets_status_dirty'):
+                    row_idx = sheet_job_ids[job_id]
+                    cell_updates.append((row_idx, sheets_client.ACKNOWLEDGED_COL,
+                                         'TRUE' if job.get('acknowledged') else 'FALSE'))
+                    cell_updates.append((row_idx, sheets_client.COMPLETED_COL,
+                                         'TRUE' if job.get('completed') else 'FALSE'))
+                    dirty_job_ids.append(job_id)
+                    pushed += 1
+            else:
+                # Job is local-only — append full row to Sheet
+                sheet_row = sheets_client.job_dict_to_row({
+                    'date_submitted': job.get('created_at', ''),
+                    'staff_notes': job.get('staff_notes', ''),
+                    'email': job.get('email', ''),
+                    'file_url': job.get('file_url', ''),
+                    'paper_size': job.get('paper_size', 'Letter'),
+                    'two_sided': 'Yes' if job.get('two_sided') else 'No',
+                    'hole_punch': 'Yes' if job.get('hole_punch') else 'No',
+                    'stapled': 'Yes' if job.get('stapled') else 'No',
+                    'quantity': job.get('quantity', 1),
+                    'room': job.get('room', ''),
+                    'deadline': job.get('deadline', ''),
+                    'user_notes': job.get('notes', ''),
+                    'acknowledged': bool(job.get('acknowledged')),
+                    'completed': bool(job.get('completed')),
+                    'job_id': job_id,
+                })
+                if sheets_client.append_row(sheet_row):
+                    pushed += 1
 
-    # Send all cell updates in a single batch API call
-    if cell_updates:
-        if not sheets_client.batch_update_cells(cell_updates):
-            logger.warning("Batch update of existing Sheet rows failed")
+        # Send all cell updates in a single batch API call
+        if cell_updates:
+            if not sheets_client.batch_update_cells(cell_updates):
+                logger.warning("Batch update of existing Sheet rows failed")
+
+        # Reset dirty flag for pushed jobs
+        if dirty_job_ids:
+            placeholders = ','.join('?' * len(dirty_job_ids))
+            cursor.execute(
+                f"UPDATE jobs SET sheets_status_dirty = 0 WHERE job_id IN ({placeholders})",
+                dirty_job_ids,
+            )
+            conn.commit()
+    finally:
+        conn.close()
 
     return pushed
 

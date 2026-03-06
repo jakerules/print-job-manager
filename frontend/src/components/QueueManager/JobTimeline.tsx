@@ -90,7 +90,12 @@ export default function JobTimeline() {
             <TimelineItem key={job.job_id || i}>
               <TimelineOppositeContent color="text.secondary" sx={{ flex: 0.3 }}>
                 <Typography variant="caption">
-                  {job.date_submitted ? new Date(job.date_submitted).toLocaleString() : ''}
+                  {job.date_submitted
+                    ? (() => {
+                        const d = new Date(job.date_submitted)
+                        return isNaN(d.getTime()) ? job.date_submitted : d.toLocaleString()
+                      })()
+                    : ''}
                 </Typography>
               </TimelineOppositeContent>
               <TimelineSeparator>

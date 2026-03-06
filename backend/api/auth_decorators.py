@@ -10,11 +10,16 @@ from api.user_repository import UserRepository
 def token_required(f):
     """
     Decorator to require valid JWT token for route access.
+    Accepts token from Authorization header or ?token= query param (for iframes).
     Adds 'current_user' to kwargs.
     """
     @wraps(f)
     def decorated(*args, **kwargs):
         token = get_token_from_header(request.headers.get('Authorization'))
+
+        # Fallback: accept token from query param (used by iframe previews)
+        if not token:
+            token = request.args.get('token')
         
         if not token:
             return jsonify({'error': 'Token is missing'}), 401

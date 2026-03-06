@@ -2,12 +2,14 @@
 Job management routes - handles job queue, status updates, and job operations.
 Uses local SQLite database. Google Sheets is no longer required.
 """
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, Response
+import io
 import secrets
 import os
 
 from api.auth_decorators import token_required, role_required
 from api.job_repository import JobRepository
+from api import sheets_client
 
 jobs_bp = Blueprint('jobs', __name__, url_prefix='/api/jobs')
 job_repo = JobRepository()
@@ -209,7 +211,8 @@ def submit_job(current_user):
 def upload_file(current_user):
     """
     Upload a file for a print job.
-    Returns a local file reference.
+    Uploads to Google Drive and returns the Drive link.
+    Falls back to local storage if Drive is not configured.
     """
     try:
         if 'file' not in request.files:
@@ -219,13 +222,40 @@ def upload_file(current_user):
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
 
+        ext = os.path.splitext(file.filename)[1].lower()
+        mime_map = {
+            '.pdf': 'application/pdf',
+            '.doc': 'application/msword',
+            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            '.ppt': 'application/vnd.ms-powerpoint',
+            '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            '.xls': 'application/vnd.ms-excel',
+            '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+        }
+        mime_type = mime_map.get(ext, 'application/octet-stream')
+
+        # Try uploading to Google Drive
+        file_stream = io.BytesIO(file.read())
+        drive_link = sheets_client.upload_file_to_drive(file_stream, file.filename, mime_type)
+
+        if drive_link:
+            return jsonify({
+                'success': True,
+                'file_url': drive_link,
+                'original_name': file.filename,
+            }), 200
+
+        # Fallback: save locally if Drive is not available
+        file_stream.seek(0)
         upload_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads')
         os.makedirs(upload_dir, exist_ok=True)
-
-        ext = os.path.splitext(file.filename)[1]
         safe_name = f"{secrets.token_hex(8)}{ext}"
         filepath = os.path.join(upload_dir, safe_name)
-        file.save(filepath)
+        with open(filepath, 'wb') as f:
+            f.write(file_stream.read())
 
         return jsonify({
             'success': True,
@@ -236,3 +266,48 @@ def upload_file(current_user):
 
     except Exception as e:
         return jsonify({'error': f'Failed to upload file: {str(e)}'}), 500
+
+
+@jobs_bp.route('/<job_id>/file', methods=['GET'])
+@token_required
+def get_job_file(current_user, job_id):
+    """
+    Proxy endpoint to fetch a job's PDF from Google Drive.
+    Streams the file content using stored Google credentials.
+    """
+    try:
+        job = job_repo.get_by_id(job_id)
+        if not job:
+            return jsonify({'error': f'Job ID {job_id} not found'}), 404
+
+        if current_user.role == 'submitter':
+            if job.get('email', '').lower() != current_user.email.lower():
+                return jsonify({'error': 'Unauthorized to view this file'}), 403
+
+        file_url = job.get('file_url', '')
+        if not file_url:
+            return jsonify({'error': 'No file associated with this job'}), 404
+
+        file_id = sheets_client.extract_file_id_from_link(file_url)
+        if not file_id:
+            return jsonify({'error': 'Could not extract Drive file ID from URL'}), 400
+
+        result = sheets_client.download_file_from_drive(file_id)
+        if not result:
+            return jsonify({'error': 'Failed to download file from Google Drive'}), 502
+
+        buf, filename, mime_type = result
+        # Sanitize filename for Content-Disposition header
+        import re
+        safe_filename = re.sub(r'[^\w\s.\-]', '_', filename)
+        return Response(
+            buf.read(),
+            mimetype=mime_type,
+            headers={
+                'Content-Disposition': f'inline; filename="{safe_filename}"',
+                'Cache-Control': 'private, max-age=300',
+            },
+        )
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch file: {str(e)}'}), 500
