@@ -179,7 +179,18 @@ def init_db():
         conn.commit()
     if 'sheets_row_pushed' not in job_columns:
         cursor.execute("ALTER TABLE jobs ADD COLUMN sheets_row_pushed BOOLEAN DEFAULT 0")
+        # All pre-existing jobs are assumed already synced; only truly new jobs need pushing
+        cursor.execute("UPDATE jobs SET sheets_row_pushed = 1")
         conn.commit()
+
+    # One-time fix: mark all pre-existing jobs as pushed if they weren't already
+    # (fixes deployments where the column was added with DEFAULT 0 and no backfill)
+    cursor.execute("SELECT COUNT(*) FROM jobs WHERE sheets_row_pushed = 0 AND created_at < '2026-03-06'")
+    stale_unpushed = cursor.fetchone()[0]
+    if stale_unpushed > 0:
+        cursor.execute("UPDATE jobs SET sheets_row_pushed = 1 WHERE sheets_row_pushed = 0 AND created_at < '2026-03-06'")
+        conn.commit()
+        print(f"  Migration: marked {stale_unpushed} pre-existing jobs as sheets_row_pushed=1")
 
     conn.close()
     print(f"Database initialized at {DB_PATH}")
