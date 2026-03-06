@@ -98,18 +98,24 @@ def pull_from_sheets() -> int:
                 ))
             else:
                 # Insert new job from Sheet
+                def _parse_bool(val):
+                    return 1 if str(val).strip().upper() in ('YES', 'TRUE', '1') else 0
+
                 cursor.execute('''
                     INSERT INTO jobs (job_id, email, room, quantity, paper_size,
-                        two_sided, deadline, notes, staff_notes,
+                        two_sided, stapled, hole_punch, file_url, deadline, notes, staff_notes,
                         acknowledged, completed, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     job_id,
                     job['email'],
                     job['room'],
                     job.get('quantity', 1),
                     job.get('paper_size', 'Letter'),
-                    1 if str(job.get('two_sided', '')).upper() in ('YES', 'TRUE', '1') else 0,
+                    _parse_bool(job.get('two_sided', '')),
+                    _parse_bool(job.get('staples', '')),
+                    _parse_bool(job.get('hole_punch', '')),
+                    job.get('drive_link', ''),
                     job.get('job_deadline', ''),
                     job.get('user_notes', ''),
                     job.get('staff_notes', ''),

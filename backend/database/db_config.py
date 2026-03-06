@@ -165,6 +165,13 @@ def init_db():
         )
         conn.commit()
 
+    # Migration: add hole_punch column to jobs if missing
+    cursor.execute("PRAGMA table_info(jobs)")
+    job_columns = [col[1] for col in cursor.fetchall()]
+    if 'hole_punch' not in job_columns:
+        cursor.execute("ALTER TABLE jobs ADD COLUMN hole_punch BOOLEAN DEFAULT FALSE")
+        conn.commit()
+
     conn.close()
     print(f"Database initialized at {DB_PATH}")
 

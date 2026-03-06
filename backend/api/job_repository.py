@@ -157,12 +157,15 @@ class JobRepository:
         acknowledged = cursor.fetchone()[0]
         cursor.execute('SELECT COUNT(*) FROM jobs WHERE completed = 1')
         completed = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM jobs WHERE completed = 1 AND date(updated_at) = date('now')")
+        completed_today = cursor.fetchone()[0]
         conn.close()
         return {
             'total': total,
             'pending': pending,
             'acknowledged': acknowledged,
             'completed': completed,
+            'completed_today': completed_today,
         }
 
     def delete(self, job_id: str) -> bool:
@@ -193,6 +196,7 @@ class JobRepository:
             'two_sided': 'Yes' if row['two_sided'] else 'No',
             'color': 'Yes' if row['color'] else 'No',
             'stapled': 'Yes' if row['stapled'] else 'No',
+            'hole_punch': 'Yes' if row['hole_punch'] else 'No',
             'date_submitted': row['created_at'] or '',
             'job_deadline': row['deadline'] or '',
             'staff_notes': row['staff_notes'] or '',

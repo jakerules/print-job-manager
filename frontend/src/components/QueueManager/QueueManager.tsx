@@ -36,12 +36,21 @@ import {
   Close,
   Visibility,
   Edit,
+  PictureAsPdf,
+  OpenInNew,
 } from '@mui/icons-material'
 import { RootState } from '../../store/store'
 import { setJobs, setLoading, updateJob } from '../../store/jobsSlice'
 import { jobService } from '../../services/jobs'
 import { wsService } from '../../services/websocket'
 import { Job } from '../../types'
+
+function getDriveFileId(url: string): string | null {
+  if (!url) return null
+  // Match /d/FILE_ID/ or id=FILE_ID patterns
+  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/)
+  return match ? match[1] : null
+}
 
 export default function QueueManager() {
   const dispatch = useDispatch()
@@ -321,6 +330,14 @@ export default function QueueManager() {
                   <Typography variant="body2">{detailJob.two_sided}</Typography>
                 </Box>
                 <Box display="flex" justifyContent="space-between">
+                  <Typography variant="body2" color="text.secondary">Stapled</Typography>
+                  <Typography variant="body2">{detailJob.stapled || 'No'}</Typography>
+                </Box>
+                <Box display="flex" justifyContent="space-between">
+                  <Typography variant="body2" color="text.secondary">Hole Punch</Typography>
+                  <Typography variant="body2">{detailJob.hole_punch || 'No'}</Typography>
+                </Box>
+                <Box display="flex" justifyContent="space-between">
                   <Typography variant="body2" color="text.secondary">Submitted</Typography>
                   <Typography variant="body2">{detailJob.date_submitted}</Typography>
                 </Box>
@@ -329,6 +346,51 @@ export default function QueueManager() {
                   <Typography variant="body2">{detailJob.job_deadline || 'None'}</Typography>
                 </Box>
               </Box>
+
+              {/* PDF Preview from Drive Link */}
+              {detailJob.file_url && getDriveFileId(detailJob.file_url) && (
+                <Box mt={2}>
+                  <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                    <Typography variant="subtitle2" display="flex" alignItems="center" gap={0.5}>
+                      <PictureAsPdf fontSize="small" /> File Preview
+                    </Typography>
+                    <Button
+                      size="small"
+                      startIcon={<OpenInNew />}
+                      href={detailJob.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Open in Drive
+                    </Button>
+                  </Box>
+                  <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+                    <iframe
+                      src={`https://drive.google.com/file/d/${getDriveFileId(detailJob.file_url)}/preview`}
+                      width="100%"
+                      height="400"
+                      style={{ border: 'none' }}
+                      allow="autoplay"
+                      title="File Preview"
+                    />
+                  </Paper>
+                </Box>
+              )}
+
+              {/* Drive link without preview */}
+              {detailJob.file_url && !getDriveFileId(detailJob.file_url) && (
+                <Box mt={2}>
+                  <Button
+                    size="small"
+                    startIcon={<OpenInNew />}
+                    href={detailJob.file_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Open File
+                  </Button>
+                </Box>
+              )}
 
               {detailJob.user_notes && (
                 <Box mt={2}>

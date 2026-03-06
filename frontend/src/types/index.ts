@@ -29,6 +29,7 @@ export interface Job {
   two_sided: string
   color?: string
   stapled?: string
+  hole_punch?: string
   date_submitted: string
   job_deadline: string
   staff_notes: string
@@ -46,6 +47,7 @@ export interface JobStats {
   pending: number
   acknowledged: number
   completed: number
+  completed_today: number
 }
 
 export interface ApiResponse<T> {

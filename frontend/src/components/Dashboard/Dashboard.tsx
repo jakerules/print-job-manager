@@ -17,36 +17,24 @@ import {
   Divider,
   Button,
   CircularProgress,
-  LinearProgress,
   Snackbar,
   Alert,
-  Badge,
 } from '@mui/material'
 import {
-  Assignment,
   CheckCircle,
   HourglassEmpty,
   Pending,
   QrCodeScanner,
   ListAlt,
   Refresh,
-  Notifications,
   ArrowForward,
-  FiberNew,
+  Today,
 } from '@mui/icons-material'
 import { RootState } from '../../store/store'
 import { setStats, addJob } from '../../store/jobsSlice'
 import { jobService } from '../../services/jobs'
 import { wsService } from '../../services/websocket'
-import { Job, JobStats } from '../../types'
-
-interface Notification {
-  id: number
-  message: string
-  type: 'info' | 'success' | 'warning' | 'error'
-  timestamp: Date
-  read: boolean
-}
+import { Job } from '../../types'
 
 export default function Dashboard() {
   const dispatch = useDispatch()
@@ -55,8 +43,7 @@ export default function Dashboard() {
   const { user } = useSelector((state: RootState) => state.auth)
 
   const [loading, setLoading] = useState(true)
-  const [recentJobs, setRecentJobs] = useState<Job[]>([])
-  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [activeJobs, setActiveJobs] = useState<Job[]>([])
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'info' | 'success' | 'warning' | 'error' }>({
     open: false,
     message: '',
@@ -72,24 +59,29 @@ export default function Dashboard() {
     }
   }, [dispatch])
 
-  const loadRecentJobs = useCallback(async () => {
+  const loadActiveJobs = useCallback(async () => {
     try {
-      const data = await jobService.getJobs({ limit: 5 })
-      setRecentJobs((data as any).jobs || [])
+      // Load new + in-progress jobs (not completed)
+      const pending = await jobService.getJobs({ status: 'pending', limit: 10 })
+      const inProgress = await jobService.getJobs({ status: 'acknowledged', limit: 10 })
+      const combined = [
+        ...((inProgress as any).jobs || []),
+        ...((pending as any).jobs || []),
+      ].slice(0, 15)
+      setActiveJobs(combined)
     } catch (error) {
-      console.error('Failed to load recent jobs:', error)
+      console.error('Failed to load active jobs:', error)
     }
   }, [])
 
   useEffect(() => {
     const init = async () => {
       setLoading(true)
-      await Promise.all([loadStats(), loadRecentJobs()])
+      await Promise.all([loadStats(), loadActiveJobs()])
       setLoading(false)
     }
     init()
 
-    // Real-time listeners
     const handleStatsUpdate = (data: any) => {
       if (data.stats) dispatch(setStats(data.stats))
     }
@@ -97,30 +89,23 @@ export default function Dashboard() {
     const handleNewJob = (data: any) => {
       if (data.job) {
         dispatch(addJob(data.job))
-        setRecentJobs((prev) => [data.job, ...prev.slice(0, 4)])
-        addNotification(`New job submitted: ${data.job.job_id}`, 'info')
+        setActiveJobs((prev) => [data.job, ...prev.slice(0, 14)])
         setSnackbar({ open: true, message: `New job: ${data.job.job_id}`, severity: 'info' })
       }
     }
 
-    const handleJobUpdated = (data: any) => {
-      if (data.action === 'completed') {
-        addNotification(`Job ${data.job_id} completed`, 'success')
-      } else if (data.action === 'acknowledged') {
-        addNotification(`Job ${data.job_id} acknowledged`, 'info')
-      }
+    const handleJobUpdated = () => {
       loadStats()
-      loadRecentJobs()
+      loadActiveJobs()
     }
 
     wsService.on('stats:update', handleStatsUpdate)
     wsService.on('job:new', handleNewJob)
     wsService.on('job:updated', handleJobUpdated)
 
-    // Poll for updates as fallback (every 30s)
     const pollInterval = setInterval(() => {
       loadStats()
-      loadRecentJobs()
+      loadActiveJobs()
     }, 30000)
 
     return () => {
@@ -129,26 +114,15 @@ export default function Dashboard() {
       wsService.off('job:updated', handleJobUpdated)
       clearInterval(pollInterval)
     }
-  }, [dispatch, loadStats, loadRecentJobs])
-
-  const addNotification = (message: string, type: Notification['type']) => {
-    setNotifications((prev) => [
-      { id: Date.now(), message, type, timestamp: new Date(), read: false },
-      ...prev.slice(0, 19),
-    ])
-  }
-
-  const completionRate = stats ? Math.round((stats.completed / Math.max(stats.total, 1)) * 100) : 0
+  }, [dispatch, loadStats, loadActiveJobs])
 
   const getJobStatusChip = (status: Job['status']) => {
     if (status.completed) return <Chip label="Done" color="success" size="small" />
     if (status.acknowledged) return <Chip label="In Progress" color="primary" size="small" />
-    return <Chip label="Pending" color="warning" size="small" />
+    return <Chip label="New" color="warning" size="small" />
   }
 
   const isStaff = user && ['admin', 'manager', 'staff'].includes(user.role)
-  const isManager = user && ['admin', 'manager'].includes(user.role)
-  const unreadCount = notifications.filter((n) => !n.read).length
 
   if (loading) {
     return (
@@ -172,7 +146,7 @@ export default function Dashboard() {
           <Button variant="outlined" startIcon={<ListAlt />} onClick={() => navigate('/queue')}>
             Queue
           </Button>
-          <IconButton onClick={() => { loadStats(); loadRecentJobs() }} title="Refresh">
+          <IconButton onClick={() => { loadStats(); loadActiveJobs() }} title="Refresh">
             <Refresh />
           </IconButton>
         </Box>
@@ -181,12 +155,11 @@ export default function Dashboard() {
       {/* Stat Cards */}
       <Grid container spacing={2}>
         {[
-          { title: 'Total Jobs', value: stats?.total || 0, icon: <Assignment sx={{ fontSize: 40 }} />, color: '#1976d2' },
-          { title: 'Pending', value: stats?.pending || 0, icon: <HourglassEmpty sx={{ fontSize: 40 }} />, color: '#ed6c02' },
+          { title: 'New', value: stats?.pending || 0, icon: <HourglassEmpty sx={{ fontSize: 40 }} />, color: '#ed6c02' },
           { title: 'In Progress', value: stats?.acknowledged || 0, icon: <Pending sx={{ fontSize: 40 }} />, color: '#0288d1' },
-          { title: 'Completed', value: stats?.completed || 0, icon: <CheckCircle sx={{ fontSize: 40 }} />, color: '#2e7d32' },
+          { title: 'Completed Today', value: stats?.completed_today || 0, icon: <Today sx={{ fontSize: 40 }} />, color: '#2e7d32' },
         ].map((card) => (
-          <Grid item xs={6} sm={6} md={3} key={card.title}>
+          <Grid item xs={4} sm={4} md={4} key={card.title}>
             <Card sx={{ bgcolor: card.color, color: 'white', cursor: 'pointer', '&:hover': { opacity: 0.9 } }}
                   onClick={() => navigate('/queue')}>
               <CardContent sx={{ p: { xs: 1.5, sm: 2 } }}>
@@ -209,108 +182,56 @@ export default function Dashboard() {
         ))}
       </Grid>
 
-      {/* Completion Progress */}
-      {isManager && (
-        <Paper sx={{ mt: 2, p: 2 }}>
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-            <Typography variant="subtitle2" color="text.secondary">Completion Rate</Typography>
-            <Typography variant="subtitle2" fontWeight="bold">{completionRate}%</Typography>
+      {/* Active Jobs (New + In Progress) */}
+      <Paper sx={{ mt: 3, p: 2 }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+          <Typography variant="h6">Active Jobs</Typography>
+          <Button size="small" endIcon={<ArrowForward />} onClick={() => navigate('/queue')}>View All</Button>
+        </Box>
+        <Divider />
+        {activeJobs.length === 0 ? (
+          <Box textAlign="center" py={4}>
+            <CheckCircle sx={{ fontSize: 48, color: 'text.disabled' }} />
+            <Typography variant="body1" color="text.secondary" mt={1}>
+              All caught up — no pending jobs!
+            </Typography>
           </Box>
-          <LinearProgress variant="determinate" value={completionRate} sx={{ height: 10, borderRadius: 5 }} />
-        </Paper>
-      )}
-
-      {/* Main Content Grid */}
-      <Grid container spacing={2} sx={{ mt: 1 }}>
-        {/* Recent Jobs */}
-        <Grid item xs={12} md={7}>
-          <Paper sx={{ p: 2, height: '100%' }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-              <Typography variant="h6">Recent Jobs</Typography>
-              <Button size="small" endIcon={<ArrowForward />} onClick={() => navigate('/queue')}>View All</Button>
-            </Box>
-            <Divider />
-            {recentJobs.length === 0 ? (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
-                No recent jobs
-              </Typography>
-            ) : (
-              <List dense disablePadding>
-                {recentJobs.map((job, i) => (
-                  <div key={job.job_id}>
-                    <ListItem sx={{ px: 0 }}>
-                      <ListItemText
-                        primary={
-                          <Box display="flex" alignItems="center" gap={1}>
-                            <Typography variant="body2" fontWeight="bold" fontFamily="monospace">
-                              {job.job_id}
-                            </Typography>
-                            {getJobStatusChip(job.status)}
-                          </Box>
-                        }
-                        secondary={`${job.email || 'N/A'} • Room ${job.room || '?'} • Qty: ${job.quantity || '?'}`}
-                      />
-                      <ListItemSecondaryAction>
-                        <Typography variant="caption" color="text.secondary">
-                          {job.date_submitted || ''}
+        ) : (
+          <List disablePadding>
+            {activeJobs.map((job, i) => (
+              <div key={job.job_id}>
+                <ListItem
+                  sx={{ px: 0, cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}
+                  onClick={() => navigate('/queue')}
+                >
+                  <ListItemText
+                    primary={
+                      <Box display="flex" alignItems="center" gap={1}>
+                        <Typography variant="body2" fontWeight="bold" fontFamily="monospace">
+                          {job.job_id}
                         </Typography>
-                      </ListItemSecondaryAction>
-                    </ListItem>
-                    {i < recentJobs.length - 1 && <Divider />}
-                  </div>
-                ))}
-              </List>
-            )}
-          </Paper>
-        </Grid>
-
-        {/* Notifications */}
-        <Grid item xs={12} md={5}>
-          <Paper sx={{ p: 2, height: '100%' }}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
-              <Box display="flex" alignItems="center" gap={1}>
-                <Typography variant="h6">Notifications</Typography>
-                {unreadCount > 0 && (
-                  <Badge badgeContent={unreadCount} color="error" />
-                )}
-              </Box>
-              {notifications.length > 0 && (
-                <Button size="small" onClick={() => setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))}>
-                  Mark all read
-                </Button>
-              )}
-            </Box>
-            <Divider />
-            {notifications.length === 0 ? (
-              <Box textAlign="center" py={3}>
-                <Notifications sx={{ fontSize: 40, color: 'text.disabled' }} />
-                <Typography variant="body2" color="text.secondary" mt={1}>
-                  No notifications yet
-                </Typography>
-                <Typography variant="caption" color="text.disabled">
-                  New events will appear here in real-time
-                </Typography>
-              </Box>
-            ) : (
-              <List dense disablePadding sx={{ maxHeight: 300, overflow: 'auto' }}>
-                {notifications.map((n) => (
-                  <ListItem key={n.id} sx={{ px: 0, opacity: n.read ? 0.6 : 1 }}>
-                    <ListItemText
-                      primary={
-                        <Box display="flex" alignItems="center" gap={0.5}>
-                          {!n.read && <FiberNew color="error" sx={{ fontSize: 16 }} />}
-                          <Typography variant="body2">{n.message}</Typography>
-                        </Box>
-                      }
-                      secondary={n.timestamp.toLocaleTimeString()}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            )}
-          </Paper>
-        </Grid>
-      </Grid>
+                        {getJobStatusChip(job.status)}
+                      </Box>
+                    }
+                    secondary={
+                      <Typography variant="body2" color="text.secondary" component="span">
+                        {job.email || 'N/A'} • Room {job.room || '?'} • Qty: {job.quantity || '?'} • {job.paper_size || '?'}
+                        {job.two_sided === 'Yes' ? ' • Duplex' : ''}
+                      </Typography>
+                    }
+                  />
+                  <ListItemSecondaryAction>
+                    <Typography variant="caption" color="text.secondary">
+                      {job.date_submitted || ''}
+                    </Typography>
+                  </ListItemSecondaryAction>
+                </ListItem>
+                {i < activeJobs.length - 1 && <Divider />}
+              </div>
+            ))}
+          </List>
+        )}
+      </Paper>
 
       {/* Toast Notification */}
       <Snackbar

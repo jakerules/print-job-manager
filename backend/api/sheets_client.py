@@ -25,27 +25,26 @@ SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 TIMESTAMP_COL = 0       # A
 STAFF_NOTES_COL = 1     # B
 EMAIL_COL = 2           # C
+DRIVE_LINK_COL = 3      # D
+PAPER_SIZE_COL = 4      # E
+TWO_SIDED_COL = 5       # F
+HOLE_PUNCH_COL = 6      # G
+STAPLES_COL = 7         # H
+QUANTITY_COL = 8        # I
 ROOM_COL = 9            # J
-QUANTITY_COL = 1
-TWO_SIDED_COL = 2
-PAPER_SIZE_COL = 3
-DATE_SUBMITTED_COL = 6
-JOB_DEADLINE_COL = 7
+JOB_DEADLINE_COL = 10   # K
 USER_NOTES_COL = 11     # L
 ACKNOWLEDGED_COL = 12   # M
 COMPLETED_COL = 13      # N
 JOB_ID_COL = 14         # O
 
 DEFAULT_COLUMN_MAP = {
-    'google_drive_link': 0,
-    'quantity': 1,
-    'two_sided': 2,
-    'paper_size': 3,
-    'staples': 4,
-    'hole_punch': 5,
-    'date_submitted': 6,
-    'job_deadline': 7,
-    'processed': 8,
+    'google_drive_link': 3,
+    'paper_size': 4,
+    'two_sided': 5,
+    'hole_punch': 6,
+    'staples': 7,
+    'quantity': 8,
     'acknowledged': 12,
     'completed': 13,
 }
@@ -419,11 +418,14 @@ def row_to_job_dict(row: list) -> dict:
         'job_id': safe(JOB_ID_COL),
         'email': safe(EMAIL_COL),
         'room': safe(ROOM_COL),
-        'quantity': safe(DEFAULT_COLUMN_MAP['quantity']),
-        'paper_size': safe(DEFAULT_COLUMN_MAP['paper_size']),
-        'two_sided': safe(DEFAULT_COLUMN_MAP['two_sided']),
-        'date_submitted': safe(DEFAULT_COLUMN_MAP['date_submitted']),
-        'job_deadline': safe(DEFAULT_COLUMN_MAP['job_deadline']),
+        'quantity': safe(QUANTITY_COL),
+        'paper_size': safe(PAPER_SIZE_COL),
+        'two_sided': safe(TWO_SIDED_COL),
+        'hole_punch': safe(HOLE_PUNCH_COL),
+        'staples': safe(STAPLES_COL),
+        'drive_link': safe(DRIVE_LINK_COL),
+        'date_submitted': safe(TIMESTAMP_COL),
+        'job_deadline': safe(JOB_DEADLINE_COL),
         'staff_notes': safe(STAFF_NOTES_COL),
         'user_notes': safe(USER_NOTES_COL),
         'acknowledged': parse_bool(ack_val),
@@ -440,14 +442,14 @@ def job_dict_to_row(job: dict) -> list:
         job.get('date_submitted', ''),            # A: Timestamp
         job.get('staff_notes', ''),                # B: Staff Notes
         job.get('email', ''),                      # C: Email
-        '',                                        # D
-        '',                                        # E
-        '',                                        # F
-        '',                                        # G
-        '',                                        # H
-        '',                                        # I
-        job.get('room', ''),                       # J: Room (col 9)
-        '',                                        # K
+        job.get('drive_link', job.get('file_url', '')),  # D: Google Drive Link
+        job.get('paper_size', ''),                 # E: Paper Size
+        job.get('two_sided', ''),                  # F: Duplex
+        job.get('hole_punch', ''),                 # G: Hole Punch
+        job.get('staples', job.get('stapled', '')),  # H: Staple
+        str(job.get('quantity', '')),              # I: Quantity
+        job.get('room', ''),                       # J: Room
+        job.get('job_deadline', job.get('deadline', '')),  # K: Deadline
         job.get('user_notes', job.get('notes', '')),  # L: User Notes
         'TRUE' if job.get('acknowledged') else 'FALSE',  # M
         'TRUE' if job.get('completed') else 'FALSE',     # N
