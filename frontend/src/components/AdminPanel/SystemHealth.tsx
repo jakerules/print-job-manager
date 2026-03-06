@@ -39,7 +39,7 @@ export default function SystemHealth() {
   const [testingSheets, setTestingSheets] = useState(false)
 
   useEffect(() => {
-    api.get('/api/system/status')
+    api.get('/system/status')
       .then((res) => setStatus(res.data))
       .catch(() => setError(true))
       .finally(() => setLoading(false))
@@ -49,7 +49,7 @@ export default function SystemHealth() {
     setTestingSheets(true)
     setSheetsTest(null)
     try {
-      const res = await api.post('/api/system/test-sheets')
+      const res = await api.post('/system/test-sheets')
       setSheetsTest(res.data)
     } catch {
       setSheetsTest({ error: 'Request failed' })

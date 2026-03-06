@@ -181,7 +181,7 @@ export default function QueueManager() {
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2} flexWrap="wrap" gap={1}>
-        <Typography variant="h4">Job Queue</Typography>
+        <Typography variant="h4">Job History</Typography>
         <Typography variant="body2" color="text.secondary">{total} total jobs</Typography>
       </Box>
 

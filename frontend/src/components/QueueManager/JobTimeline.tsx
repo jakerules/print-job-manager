@@ -19,32 +19,31 @@ import {
 } from '@mui/lab'
 import {
   CheckCircle,
-  HourglassEmpty,
   Print,
-  LocalShipping,
   FiberNew,
 } from '@mui/icons-material'
 import api from '../../services/api'
 
 interface Job {
-  id: string
-  timestamp: string
+  job_id: string
+  date_submitted: string
   email: string
-  status: string
-  acknowledged: boolean
-  completed: boolean
-  room_number?: string
+  room: string
+  status: {
+    acknowledged: boolean
+    completed: boolean
+  }
 }
 
 const statusIcon = (job: Job) => {
-  if (job.completed) return <CheckCircle />
-  if (job.acknowledged) return <Print />
+  if (job.status.completed) return <CheckCircle />
+  if (job.status.acknowledged) return <Print />
   return <FiberNew />
 }
 
 const statusColor = (job: Job): 'success' | 'primary' | 'warning' => {
-  if (job.completed) return 'success'
-  if (job.acknowledged) return 'primary'
+  if (job.status.completed) return 'success'
+  if (job.status.acknowledged) return 'primary'
   return 'warning'
 }
 
@@ -54,7 +53,7 @@ export default function JobTimeline() {
   const [filter, setFilter] = useState('')
 
   useEffect(() => {
-    api.get('/api/jobs', { params: { limit: 50 } })
+    api.get('/jobs', { params: { limit: 50 } })
       .then((res) => setJobs(res.data.jobs || []))
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -62,7 +61,7 @@ export default function JobTimeline() {
 
   const filtered = jobs.filter((j) =>
     !filter ||
-    j.id?.toLowerCase().includes(filter.toLowerCase()) ||
+    j.job_id?.toLowerCase().includes(filter.toLowerCase()) ||
     j.email?.toLowerCase().includes(filter.toLowerCase())
   )
 
@@ -88,10 +87,10 @@ export default function JobTimeline() {
       ) : (
         <Timeline position="alternate">
           {filtered.map((job, i) => (
-            <TimelineItem key={job.id || i}>
+            <TimelineItem key={job.job_id || i}>
               <TimelineOppositeContent color="text.secondary" sx={{ flex: 0.3 }}>
                 <Typography variant="caption">
-                  {job.timestamp ? new Date(job.timestamp).toLocaleString() : ''}
+                  {job.date_submitted ? new Date(job.date_submitted).toLocaleString() : ''}
                 </Typography>
               </TimelineOppositeContent>
               <TimelineSeparator>
@@ -104,10 +103,10 @@ export default function JobTimeline() {
                 <Paper elevation={2} sx={{ p: 2 }}>
                   <Box display="flex" justifyContent="space-between" alignItems="center">
                     <Typography variant="subtitle2" fontFamily="monospace">
-                      {job.id || 'No ID'}
+                      {job.job_id || 'No ID'}
                     </Typography>
                     <Chip
-                      label={job.completed ? 'Completed' : job.acknowledged ? 'In Progress' : 'Pending'}
+                      label={job.status.completed ? 'Completed' : job.status.acknowledged ? 'In Progress' : 'Pending'}
                       size="small"
                       color={statusColor(job)}
                     />
@@ -115,9 +114,9 @@ export default function JobTimeline() {
                   <Typography variant="body2" color="text.secondary">
                     {job.email}
                   </Typography>
-                  {job.room_number && (
+                  {job.room && (
                     <Typography variant="caption" color="text.secondary">
-                      Room {job.room_number}
+                      Room {job.room}
                     </Typography>
                   )}
                 </Paper>

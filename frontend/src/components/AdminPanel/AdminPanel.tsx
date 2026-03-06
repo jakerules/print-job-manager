@@ -69,7 +69,7 @@ export default function AdminPanel() {
   const loadUsers = async () => {
     setLoading(true)
     try {
-      const res = await api.get('/api/users')
+      const res = await api.get('/users')
       setUsers(res.data.users || res.data || [])
     } catch {
       setSnackbar({ open: true, message: 'Failed to load users', severity: 'error' })
@@ -97,10 +97,10 @@ export default function AdminPanel() {
       if (editingUser) {
         const data: any = { username: form.username, email: form.email, role: form.role, is_active: form.is_active }
         if (form.password) data.password = form.password
-        await api.put(`/api/users/${editingUser.id}`, data)
+        await api.put(`/users/${editingUser.id}`, data)
         setSnackbar({ open: true, message: 'User updated', severity: 'success' })
       } else {
-        await api.post('/api/users', form)
+        await api.post('/users', form)
         setSnackbar({ open: true, message: 'User created', severity: 'success' })
       }
       setDialogOpen(false)
@@ -113,7 +113,7 @@ export default function AdminPanel() {
   const handleDelete = async () => {
     if (!deleteConfirm) return
     try {
-      await api.delete(`/api/users/${deleteConfirm.id}`)
+      await api.delete(`/users/${deleteConfirm.id}`)
       setSnackbar({ open: true, message: 'User deleted', severity: 'success' })
       setDeleteConfirm(null)
       loadUsers()

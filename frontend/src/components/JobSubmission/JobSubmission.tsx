@@ -86,7 +86,7 @@ export default function JobSubmission() {
       if (file) {
         const formData = new FormData()
         formData.append('file', file)
-        const uploadRes = await api.post('/api/jobs/upload-file', formData, {
+        const uploadRes = await api.post('/jobs/upload-file', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         })
         file_url = uploadRes.data.file_url || uploadRes.data.url || ''
@@ -105,7 +105,7 @@ export default function JobSubmission() {
         file_url: file_url || undefined,
       }
 
-      const res = await api.post('/api/jobs/submit', payload)
+      const res = await api.post('/jobs/submit', payload)
       setResult(res.data)
       setSnackbar({ open: true, message: `Job submitted! ID: ${res.data.job_id}`, severity: 'success' })
     } catch (err: any) {

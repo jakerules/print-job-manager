@@ -36,7 +36,7 @@ export default function NotificationPreferences() {
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' })
 
   useEffect(() => {
-    api.get('/api/notifications/preferences')
+    api.get('/notifications/preferences')
       .then((res) => setPrefs(res.data.preferences))
       .catch(() => {})
   }, [])
@@ -48,7 +48,7 @@ export default function NotificationPreferences() {
 
   const handleSave = async () => {
     try {
-      await api.put('/api/notifications/preferences', prefs)
+      await api.put('/notifications/preferences', prefs)
       setSnackbar({ open: true, message: 'Preferences saved', severity: 'success' })
       setDirty(false)
 

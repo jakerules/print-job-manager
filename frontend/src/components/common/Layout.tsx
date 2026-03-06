@@ -75,7 +75,7 @@ export default function Layout() {
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
     { text: 'Submit Job', icon: <SubmitIcon />, path: '/submit' },
-    { text: 'Queue', icon: <QueueIcon />, path: '/queue' },
+    { text: 'Job History', icon: <QueueIcon />, path: '/queue' },
     { text: 'Timeline', icon: <TimelineIcon />, path: '/timeline' },
     { text: 'Scanner', icon: <ScannerIcon />, path: '/scanner' },
     { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },

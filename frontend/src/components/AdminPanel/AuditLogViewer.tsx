@@ -46,7 +46,7 @@ export default function AuditLogViewer() {
     try {
       const params: any = { limit: rowsPerPage, offset: page * rowsPerPage }
       if (actionFilter) params.action = actionFilter
-      const res = await api.get('/api/audit/log', { params })
+      const res = await api.get('/audit/log', { params })
       setEntries(res.data.entries || [])
       setTotal(res.data.total || 0)
     } catch {
