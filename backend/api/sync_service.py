@@ -86,12 +86,14 @@ def pull_from_sheets() -> int:
                     UPDATE jobs SET
                         acknowledged = ?,
                         completed = ?,
+                        completed_at = COALESCE(?, completed_at),
                         staff_notes = ?,
                         updated_at = ?
                     WHERE job_id = ?
                 ''', (
                     job['acknowledged'],
                     job['completed'],
+                    job.get('completed_at') or None,
                     job['staff_notes'],
                     datetime.now(timezone.utc).isoformat(),
                     job_id,
@@ -104,8 +106,8 @@ def pull_from_sheets() -> int:
                 cursor.execute('''
                     INSERT INTO jobs (job_id, email, room, quantity, paper_size,
                         two_sided, stapled, hole_punch, file_url, deadline, notes, staff_notes,
-                        acknowledged, completed, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        acknowledged, completed, completed_at, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     job_id,
                     job['email'],
@@ -121,6 +123,7 @@ def pull_from_sheets() -> int:
                     job.get('staff_notes', ''),
                     job['acknowledged'],
                     job['completed'],
+                    job.get('completed_at') or None,
                     job.get('date_submitted') or datetime.now(timezone.utc).isoformat(),
                     datetime.now(timezone.utc).isoformat(),
                 ))

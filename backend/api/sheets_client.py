@@ -37,6 +37,7 @@ USER_NOTES_COL = 11     # L
 ACKNOWLEDGED_COL = 12   # M
 COMPLETED_COL = 13      # N
 JOB_ID_COL = 14         # O
+COMPLETED_DATE_COL = 17 # R
 
 DEFAULT_COLUMN_MAP = {
     'google_drive_link': 3,
@@ -430,6 +431,7 @@ def row_to_job_dict(row: list) -> dict:
         'user_notes': safe(USER_NOTES_COL),
         'acknowledged': parse_bool(ack_val),
         'completed': parse_bool(comp_val),
+        'completed_at': safe(COMPLETED_DATE_COL),
     }
 
 

@@ -171,6 +171,9 @@ def init_db():
     if 'hole_punch' not in job_columns:
         cursor.execute("ALTER TABLE jobs ADD COLUMN hole_punch BOOLEAN DEFAULT FALSE")
         conn.commit()
+    if 'completed_at' not in job_columns:
+        cursor.execute("ALTER TABLE jobs ADD COLUMN completed_at TEXT")
+        conn.commit()
 
     conn.close()
     print(f"Database initialized at {DB_PATH}")

@@ -105,6 +105,11 @@ class JobRepository:
         if completed is not None:
             sets.append('completed = ?')
             params.append(completed)
+            if completed:
+                sets.append('completed_at = ?')
+                params.append(datetime.now(timezone.utc).isoformat())
+            else:
+                sets.append('completed_at = NULL')
 
         if not sets:
             conn.close()
@@ -155,9 +160,14 @@ class JobRepository:
         pending = cursor.fetchone()[0]
         cursor.execute('SELECT COUNT(*) FROM jobs WHERE acknowledged = 1 AND completed = 0')
         acknowledged = cursor.fetchone()[0]
-        cursor.execute('SELECT COUNT(*) FROM jobs WHERE completed = 1')
+        cursor.execute("SELECT COUNT(*) FROM jobs WHERE completed = 1")
         completed = cursor.fetchone()[0]
-        cursor.execute("SELECT COUNT(*) FROM jobs WHERE completed = 1 AND date(updated_at) = date('now')")
+        # Use completed_at date in US Eastern time for "completed today"
+        cursor.execute("""
+            SELECT COUNT(*) FROM jobs
+            WHERE completed = 1
+            AND date(completed_at, '-5 hours') = date('now', '-5 hours')
+        """)
         completed_today = cursor.fetchone()[0]
         conn.close()
         return {
